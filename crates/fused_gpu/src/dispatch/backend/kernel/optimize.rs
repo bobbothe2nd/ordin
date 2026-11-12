@@ -107,9 +107,7 @@ pub fn optimize(kernel: &mut RawKernel, options: &CompilationOptions) -> Result<
                 }
 
                 if let Some(Op::ConstF32 { val }) = kernel.vals[b].init {
-                    kernel.vals[b]
-                        .init
-                        .replace(Op::ConstF32 { val: 1.0 / val });
+                    kernel.vals[b].init.replace(Op::ConstF32 { val: 1.0 / val });
 
                     kernel.vals[val_id].init.replace(Op::Mul { a, b });
                 }
@@ -191,9 +189,7 @@ fn dead_code_elimination(kernel: &mut RawKernel, options: &CompilationOptions) {
                 continue;
             }
 
-            if !any_ops(kernel, |op| {
-                op.does_read(val_id) && !op.does_mutate(val_id)
-            }) {
+            if !any_ops(kernel, |op| op.does_read(val_id) && !op.does_mutate(val_id)) {
                 kernel.vals[val_id].state = ValueState::Masked;
                 erase_writes(kernel, val_id);
             }
@@ -431,12 +427,7 @@ fn op_assign(kernel: &mut RawKernel) {
             }
         }
 
-        if let Op::ParamStore {
-            param,
-            index,
-            val,
-        } = kernel.ops[op_id]
-        {
+        if let Op::ParamStore { param, index, val } = kernel.ops[op_id] {
             let val = &mut kernel.vals[val];
 
             if val.state == ValueState::Inline {

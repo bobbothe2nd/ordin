@@ -1,9 +1,13 @@
 use fused_gpu::{
     dispatch::{
-        CompilationOptions, backend::{
-            Axis, DType, DispatchOptions, Graph, GraphOp, GraphOpFlags, Node, NodeId, Op, Param, ParamId, SimpleDType, ValueId, ValueState, kernel::{LinkedKernel, NodeInput, SaveIndicator},
+        CompilationOptions,
+        backend::{
+            Axis, DType, DispatchOptions, Graph, GraphOp, GraphOpFlags, Node, NodeId, Op, Param,
+            ParamId, SimpleDType, ValueId, ValueState,
+            kernel::{LinkedKernel, NodeInput, SaveIndicator},
         },
-    }, errors::{Error, ErrorKind, GraphErrorContext},
+    },
+    errors::{Error, ErrorKind, GraphErrorContext},
 };
 use std::{format, vec, vec::Vec};
 
@@ -161,9 +165,7 @@ pub fn lower_softmax_recursive(
                     },
                 );
 
-                kernel
-                    .raw
-                    .accum_var(col, Op::ConstU32 { val: shared_size });
+                kernel.raw.accum_var(col, Op::ConstU32 { val: shared_size });
 
                 Ok(())
             })?;
@@ -328,9 +330,7 @@ pub fn lower_softmax_recursive(
 
                 kernel.raw.accum_var(local_sum, Op::CopyVar { id: e });
 
-                kernel
-                    .raw
-                    .accum_var(col, Op::ConstU32 { val: shared_size });
+                kernel.raw.accum_var(col, Op::ConstU32 { val: shared_size });
 
                 Ok(())
             })?;
@@ -429,9 +429,7 @@ pub fn lower_softmax_recursive(
 
                 kernel.param_mul(saved_param, idx, inv_row_sum);
 
-                kernel
-                    .raw
-                    .accum_var(col, Op::ConstU32 { val: shared_size });
+                kernel.raw.accum_var(col, Op::ConstU32 { val: shared_size });
 
                 Ok(())
             })?;
@@ -508,9 +506,7 @@ pub fn lower_softmax_recursive(
                     },
                 );
 
-                kernel
-                    .raw
-                    .accum_var(col, Op::ConstU32 { val: shared_size });
+                kernel.raw.accum_var(col, Op::ConstU32 { val: shared_size });
 
                 Ok(())
             })?;
@@ -669,9 +665,7 @@ pub fn lower_softmax_recursive(
 
                 kernel.param_accum(grad, idx, y_scaled_dy_dot);
 
-                kernel
-                    .raw
-                    .accum_var(col, Op::ConstU32 { val: shared_size });
+                kernel.raw.accum_var(col, Op::ConstU32 { val: shared_size });
 
                 Ok(())
             })?;

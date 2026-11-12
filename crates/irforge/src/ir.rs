@@ -1,4 +1,7 @@
-use fused_gpu::dispatch::{CompilationOptions, backend::{self, Metadata as InnerMeta}};
+use fused_gpu::dispatch::{
+    CompilationOptions,
+    backend::{self, Metadata as InnerMeta},
+};
 
 use briny::traits::Pod;
 

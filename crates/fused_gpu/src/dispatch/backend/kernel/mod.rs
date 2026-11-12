@@ -1,9 +1,13 @@
 use crate::{
     dispatch::{
-        CompilationOptions, backend::{
-            DType, Graph, GraphOp, MetaId, Metadata, NodeId, Op, Param, ParamId, SharedAlloc, SharedId, SimpleDType, TensorLayout, Value, ValueId, ValueState,
+        CompilationOptions,
+        backend::{
+            DType, Graph, GraphOp, MetaId, Metadata, NodeId, Op, Param, ParamId, SharedAlloc,
+            SharedId, SimpleDType, TensorLayout, Value, ValueId, ValueState,
         },
-    }, errors::{Error, ErrorKind}, tensor::Block,
+    },
+    errors::{Error, ErrorKind},
+    tensor::Block,
 };
 use std::vec::Vec;
 
@@ -295,71 +299,43 @@ impl LinkedKernel {
     pub fn param_store(&mut self, param: ParamId, index: ValueId, val: ValueId) {
         self.register_param(param);
 
-        self.raw.ops.push(Op::ParamStore {
-            param,
-            index,
-            val,
-        });
+        self.raw.ops.push(Op::ParamStore { param, index, val });
     }
 
     pub fn param_accum(&mut self, param: ParamId, index: ValueId, val: ValueId) {
         self.register_param(param);
 
-        self.raw.ops.push(Op::ParamAccum {
-            param,
-            index,
-            val,
-        });
+        self.raw.ops.push(Op::ParamAccum { param, index, val });
     }
 
     pub fn param_mul(&mut self, param: ParamId, index: ValueId, val: ValueId) {
         self.register_param(param);
 
-        self.raw.ops.push(Op::ParamMul {
-            param,
-            index,
-            val,
-        });
+        self.raw.ops.push(Op::ParamMul { param, index, val });
     }
 
     pub fn param_div(&mut self, param: ParamId, index: ValueId, val: ValueId) {
         self.register_param(param);
 
-        self.raw.ops.push(Op::ParamDiv {
-            param,
-            index,
-            val,
-        });
+        self.raw.ops.push(Op::ParamDiv { param, index, val });
     }
 
     pub fn param_sub(&mut self, param: ParamId, index: ValueId, val: ValueId) {
         self.register_param(param);
 
-        self.raw.ops.push(Op::ParamSub {
-            param,
-            index,
-            val,
-        });
+        self.raw.ops.push(Op::ParamSub { param, index, val });
     }
 
     pub fn param_shl(&mut self, param: ParamId, index: ValueId, val: ValueId) {
         self.register_param(param);
 
-        self.raw.ops.push(Op::ParamShl {
-            param,
-            index,
-            val,
-        });
+        self.raw.ops.push(Op::ParamShl { param, index, val });
     }
 
     pub fn param_shr(&mut self, param: ParamId, index: ValueId, val: ValueId) {
         self.register_param(param);
 
-        self.raw.ops.push(Op::ParamShr {
-            param,
-            index,
-            val,
-        });
+        self.raw.ops.push(Op::ParamShr { param, index, val });
     }
 }
 
@@ -475,12 +451,36 @@ impl RawKernel {
         ret
     }
 
-    pub fn load_matrix_sync(&mut self, param: ParamId, frag: ValueId, index: ValueId, stride: ValueId) {
-        self.ops.push(Op::LoadMatrixSync { param, frag, index, stride });
+    pub fn load_matrix_sync(
+        &mut self,
+        param: ParamId,
+        frag: ValueId,
+        index: ValueId,
+        stride: ValueId,
+    ) {
+        self.ops.push(Op::LoadMatrixSync {
+            param,
+            frag,
+            index,
+            stride,
+        });
     }
 
-    pub fn store_matrix_sync(&mut self, param: ParamId, frag: ValueId, index: ValueId, stride: ValueId, layout: TensorLayout) {
-        self.ops.push(Op::StoreMatrixSync { param, frag, index, stride, layout });
+    pub fn store_matrix_sync(
+        &mut self,
+        param: ParamId,
+        frag: ValueId,
+        index: ValueId,
+        stride: ValueId,
+        layout: TensorLayout,
+    ) {
+        self.ops.push(Op::StoreMatrixSync {
+            param,
+            frag,
+            index,
+            stride,
+            layout,
+        });
     }
 
     pub fn fill_frag(&mut self, frag: ParamId, val: ValueId) {
@@ -492,59 +492,31 @@ impl RawKernel {
     }
 
     pub fn param_store(&mut self, param: ParamId, index: ValueId, val: ValueId) {
-        self.ops.push(Op::ParamStore {
-            param,
-            index,
-            val,
-        });
+        self.ops.push(Op::ParamStore { param, index, val });
     }
 
     pub fn param_accum(&mut self, param: ParamId, index: ValueId, val: ValueId) {
-        self.ops.push(Op::ParamAccum {
-            param,
-            index,
-            val,
-        });
+        self.ops.push(Op::ParamAccum { param, index, val });
     }
 
     pub fn param_mul(&mut self, param: ParamId, index: ValueId, val: ValueId) {
-        self.ops.push(Op::ParamMul {
-            param,
-            index,
-            val,
-        });
+        self.ops.push(Op::ParamMul { param, index, val });
     }
 
     pub fn param_div(&mut self, param: ParamId, index: ValueId, val: ValueId) {
-        self.ops.push(Op::ParamDiv {
-            param,
-            index,
-            val,
-        });
+        self.ops.push(Op::ParamDiv { param, index, val });
     }
 
     pub fn param_sub(&mut self, param: ParamId, index: ValueId, val: ValueId) {
-        self.ops.push(Op::ParamSub {
-            param,
-            index,
-            val,
-        });
+        self.ops.push(Op::ParamSub { param, index, val });
     }
 
     pub fn param_shl(&mut self, param: ParamId, index: ValueId, val: ValueId) {
-        self.ops.push(Op::ParamShl {
-            param,
-            index,
-            val,
-        });
+        self.ops.push(Op::ParamShl { param, index, val });
     }
 
     pub fn param_shr(&mut self, param: ParamId, index: ValueId, val: ValueId) {
-        self.ops.push(Op::ParamShr {
-            param,
-            index,
-            val,
-        });
+        self.ops.push(Op::ParamShr { param, index, val });
     }
 
     pub fn def_var(&mut self, dtype: DType, state: ValueState, init: Option<Op>) -> ValueId {
@@ -557,7 +529,9 @@ impl RawKernel {
     }
 
     pub fn overwrite_var(&mut self, id: ValueId, op: Op) {
-        let val = if let Op::CopyVar { id } = op { id } else {
+        let val = if let Op::CopyVar { id } = op {
+            id
+        } else {
             let dtype = self.vals[id].dtype;
             self.def_var(dtype, ValueState::Inline, Some(op))
         };

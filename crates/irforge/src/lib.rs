@@ -27,7 +27,10 @@ pub mod dispatch {
     pub use crate::{
         backend::{GpuContext, MetaBinding, SavedNodes, Schedule},
         graph::Graph,
-        ir::{KernelGroup, MetaBuilder, RawMetaBuf, Metadata, EdgeId, MetaId, NodeId, ParamId, SharedId, ValueId},
+        ir::{
+            EdgeId, KernelGroup, MetaBuilder, MetaId, Metadata, NodeId, ParamId, RawMetaBuf,
+            SharedId, ValueId,
+        },
     };
 
     pub mod backend {
@@ -77,7 +80,7 @@ pub mod nn {
 }
 
 pub mod codegen {
-    pub use fused_gpu::dispatch::backend::{kernel::remap::*, codegen::*};
+    pub use fused_gpu::dispatch::backend::{codegen::*, kernel::remap::*};
 
     #[cfg(feature = "wgsl")]
     pub use fused_gpu::dispatch::backend::wgsl::generate::generate_wgsl;

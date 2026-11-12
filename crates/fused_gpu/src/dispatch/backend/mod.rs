@@ -277,8 +277,20 @@ impl DType {
     pub const fn bits(self) -> usize {
         match self {
             Self::Simple(dtype) => dtype.bits(),
-            Self::MmaA { dtype, m, n, k, layout: _ }
-            | Self::MmaB { dtype, m, n, k, layout: _ }
+            Self::MmaA {
+                dtype,
+                m,
+                n,
+                k,
+                layout: _,
+            }
+            | Self::MmaB {
+                dtype,
+                m,
+                n,
+                k,
+                layout: _,
+            }
             | Self::MmaAccum { dtype, m, n, k } => dtype.bits() * (m * n * k) as usize,
         }
     }
@@ -288,8 +300,20 @@ impl DType {
     pub const fn size(self) -> usize {
         match self {
             Self::Simple(dtype) => dtype.size(),
-            Self::MmaA { dtype, m, n, k, layout: _ }
-            | Self::MmaB { dtype, m, n, k, layout: _ }
+            Self::MmaA {
+                dtype,
+                m,
+                n,
+                k,
+                layout: _,
+            }
+            | Self::MmaB {
+                dtype,
+                m,
+                n,
+                k,
+                layout: _,
+            }
             | Self::MmaAccum { dtype, m, n, k } => dtype.size() * (m * n * k) as usize,
         }
     }
@@ -812,7 +836,14 @@ impl GraphOp {
     #[inline]
     #[must_use]
     pub const fn is_const(&self) -> bool {
-        matches!(self, Self::ConstF32(_) | Self::ConstF16(_) | Self::ConstBf16(_) | Self::ConstU32(_) | Self::ConstI32(_))
+        matches!(
+            self,
+            Self::ConstF32(_)
+                | Self::ConstF16(_)
+                | Self::ConstBf16(_)
+                | Self::ConstU32(_)
+                | Self::ConstI32(_)
+        )
     }
 
     #[inline]
@@ -1265,16 +1296,17 @@ impl Graph {
     /// # Errors
     ///
     /// Fails if the graph has invalid operations.
-    pub fn lower(
-        &self,
-        meta: Metadata,
-        saved: &[SaveIndicator],
-    ) -> Result<KernelGroup, Error> {
-        KernelsChained::lower(self, meta, saved, &self.options.ok_or(Error {
-            msg: "no compilation options attached to graph",
-            kind: ErrorKind::InvalidArgument,
-            ctx: (),
-        })?)
+    pub fn lower(&self, meta: Metadata, saved: &[SaveIndicator]) -> Result<KernelGroup, Error> {
+        KernelsChained::lower(
+            self,
+            meta,
+            saved,
+            &self.options.ok_or(Error {
+                msg: "no compilation options attached to graph",
+                kind: ErrorKind::InvalidArgument,
+                ctx: (),
+            })?,
+        )
     }
 
     pub fn push_node(&mut self, node: Node) -> NodeId {
@@ -1324,23 +1356,53 @@ impl Graph {
     }
 
     pub fn constant_f32(&mut self, data: f32) -> NodeId {
-        self.add_node::<&[usize]>("const_f32", GraphOp::ConstF32(data), &[], &[], SimpleDType::F32)
+        self.add_node::<&[usize]>(
+            "const_f32",
+            GraphOp::ConstF32(data),
+            &[],
+            &[],
+            SimpleDType::F32,
+        )
     }
 
     pub fn constant_u32(&mut self, data: u32) -> NodeId {
-        self.add_node::<&[usize]>("const_u32", GraphOp::ConstU32(data), &[], &[], SimpleDType::F32)
+        self.add_node::<&[usize]>(
+            "const_u32",
+            GraphOp::ConstU32(data),
+            &[],
+            &[],
+            SimpleDType::F32,
+        )
     }
 
     pub fn constant_i32(&mut self, data: i32) -> NodeId {
-        self.add_node::<&[usize]>("const_i32", GraphOp::ConstI32(data), &[], &[], SimpleDType::F32)
+        self.add_node::<&[usize]>(
+            "const_i32",
+            GraphOp::ConstI32(data),
+            &[],
+            &[],
+            SimpleDType::F32,
+        )
     }
 
     pub fn constant_f16(&mut self, data: f16) -> NodeId {
-        self.add_node::<&[usize]>("const_f16", GraphOp::ConstF16(data), &[], &[], SimpleDType::F32)
+        self.add_node::<&[usize]>(
+            "const_f16",
+            GraphOp::ConstF16(data),
+            &[],
+            &[],
+            SimpleDType::F32,
+        )
     }
 
     pub fn constant_bf16(&mut self, data: bf16) -> NodeId {
-        self.add_node::<&[usize]>("const_bf16", GraphOp::ConstBf16(data), &[], &[], SimpleDType::F32)
+        self.add_node::<&[usize]>(
+            "const_bf16",
+            GraphOp::ConstBf16(data),
+            &[],
+            &[],
+            SimpleDType::F32,
+        )
     }
 
     pub fn repeat<I>(&mut self, count: usize, mut start: I, structure: fn(&mut Self, I) -> I) {

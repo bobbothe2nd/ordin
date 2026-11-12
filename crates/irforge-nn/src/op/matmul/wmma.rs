@@ -1,9 +1,13 @@
 use fused_gpu::{
     dispatch::{
-        CompilationOptions, backend::{
-            Axis, DType, Graph, NodeId, Op, Param, ParamId, SimpleDType, TensorLayout, ValueId, ValueState, kernel::{LinkedKernel, NodeInput},
+        CompilationOptions,
+        backend::{
+            Axis, DType, Graph, NodeId, Op, Param, ParamId, SimpleDType, TensorLayout, ValueId,
+            ValueState,
+            kernel::{LinkedKernel, NodeInput},
         },
-    }, errors::{Error, ErrorKind},
+    },
+    errors::{Error, ErrorKind},
 };
 use std::vec::Vec;
 
@@ -54,11 +58,15 @@ pub fn forward_matmul(
     _stable_iteration_space: &mut bool,
     options: &CompilationOptions,
 ) -> Result<Vec<NodeId>, Error> {
-    let subgroup_size = options.target.subgroup_size.ok_or(Error {
-        msg: "attempted WMMA matmul with unknown subgroup size",
-        kind: ErrorKind::InternalError,
-        ctx: (),
-    })?.get() as u32;
+    let subgroup_size = options
+        .target
+        .subgroup_size
+        .ok_or(Error {
+            msg: "attempted WMMA matmul with unknown subgroup size",
+            kind: ErrorKind::InternalError,
+            ctx: (),
+        })?
+        .get() as u32;
     let block = [subgroup_size / 8, 8, 1];
 
     let tile_width = options.opt.tile_size;
@@ -74,7 +82,10 @@ pub fn forward_matmul(
     let tile_m = kernel.raw.def_var(
         DType::Simple(SimpleDType::U32),
         ValueState::Immut,
-        Some(Op::Mul { a: tile_size, b: bid_x }),
+        Some(Op::Mul {
+            a: tile_size,
+            b: bid_x,
+        }),
     );
 
     let bid_y = kernel.raw.def_var(
@@ -85,7 +96,10 @@ pub fn forward_matmul(
     let tile_n = kernel.raw.def_var(
         DType::Simple(SimpleDType::U32),
         ValueState::Immut,
-        Some(Op::Mul { a: tile_size, b: bid_y }),
+        Some(Op::Mul {
+            a: tile_size,
+            b: bid_y,
+        }),
     );
 
     println!("{node_id} := MatMul({a_node:?}, {b_node:?})\n {saved_params:?}");
@@ -122,7 +136,7 @@ pub fn forward_matmul(
             k: tile_width,
             layout: if swap_a {
                 TensorLayout::ColMajor
-            } else { 
+            } else {
                 TensorLayout::RowMajor
             },
         },
@@ -137,7 +151,7 @@ pub fn forward_matmul(
             k: tile_width,
             layout: if swap_b {
                 TensorLayout::ColMajor
-            } else { 
+            } else {
                 TensorLayout::RowMajor
             },
         },
@@ -145,7 +159,12 @@ pub fn forward_matmul(
         None,
     );
     let frag_c = kernel.raw.def_var(
-        DType::MmaAccum { dtype, m: tile_width, n: tile_width, k: tile_width },
+        DType::MmaAccum {
+            dtype,
+            m: tile_width,
+            n: tile_width,
+            k: tile_width,
+        },
         ValueState::Mut,
         None,
     );
@@ -165,24 +184,70 @@ pub fn forward_matmul(
 
     kernel.push_for_loop(tk, k, tile_size, |kernel| {
         let a_col = if swap_a {
-            let a_row = kernel.raw.def_var(DType::Simple(SimpleDType::U32), ValueState::Inline, Some(Op::Mul { a: k, b: tk }));
-            kernel.raw.def_var(DType::Simple(SimpleDType::U32), ValueState::Inline, Some(Op::Add { a: a_row, b: tile_m }))
+            let a_row = kernel.raw.def_var(
+                DType::Simple(SimpleDType::U32),
+                ValueState::Inline,
+                Some(Op::Mul { a: k, b: tk }),
+            );
+            kernel.raw.def_var(
+                DType::Simple(SimpleDType::U32),
+                ValueState::Inline,
+                Some(Op::Add {
+                    a: a_row,
+                    b: tile_m,
+                }),
+            )
         } else {
-            let a_row = kernel.raw.def_var(DType::Simple(SimpleDType::U32), ValueState::Inline, Some(Op::Mul { a: k, b: tile_m }));
-            kernel.raw.def_var(DType::Simple(SimpleDType::U32), ValueState::Inline, Some(Op::Add { a: a_row, b: tk }))
+            let a_row = kernel.raw.def_var(
+                DType::Simple(SimpleDType::U32),
+                ValueState::Inline,
+                Some(Op::Mul { a: k, b: tile_m }),
+            );
+            kernel.raw.def_var(
+                DType::Simple(SimpleDType::U32),
+                ValueState::Inline,
+                Some(Op::Add { a: a_row, b: tk }),
+            )
         };
-        let a_idx = kernel.raw.def_var(DType::Simple(SimpleDType::U32), ValueState::Inline, Some(Op::Add { a: a_col, b: base }));
+        let a_idx = kernel.raw.def_var(
+            DType::Simple(SimpleDType::U32),
+            ValueState::Inline,
+            Some(Op::Add { a: a_col, b: base }),
+        );
 
         kernel.raw.load_matrix_sync(a, frag_a, a_idx, k);
 
         let b_col = if swap_b {
-            let b_row = kernel.raw.def_var(DType::Simple(SimpleDType::U32), ValueState::Inline, Some(Op::Mul { a: n, b: tile_n }));
-            kernel.raw.def_var(DType::Simple(SimpleDType::U32), ValueState::Inline, Some(Op::Add { a: b_row, b: tk }))
+            let b_row = kernel.raw.def_var(
+                DType::Simple(SimpleDType::U32),
+                ValueState::Inline,
+                Some(Op::Mul { a: n, b: tile_n }),
+            );
+            kernel.raw.def_var(
+                DType::Simple(SimpleDType::U32),
+                ValueState::Inline,
+                Some(Op::Add { a: b_row, b: tk }),
+            )
         } else {
-            let b_row = kernel.raw.def_var(DType::Simple(SimpleDType::U32), ValueState::Inline, Some(Op::Mul { a: n, b: tk }));
-            kernel.raw.def_var(DType::Simple(SimpleDType::U32), ValueState::Inline, Some(Op::Add { a: b_row, b: tile_n }))
+            let b_row = kernel.raw.def_var(
+                DType::Simple(SimpleDType::U32),
+                ValueState::Inline,
+                Some(Op::Mul { a: n, b: tk }),
+            );
+            kernel.raw.def_var(
+                DType::Simple(SimpleDType::U32),
+                ValueState::Inline,
+                Some(Op::Add {
+                    a: b_row,
+                    b: tile_n,
+                }),
+            )
         };
-        let b_idx = kernel.raw.def_var(DType::Simple(SimpleDType::U32), ValueState::Inline, Some(Op::Add { a: b_col, b: base }));
+        let b_idx = kernel.raw.def_var(
+            DType::Simple(SimpleDType::U32),
+            ValueState::Inline,
+            Some(Op::Add { a: b_col, b: base }),
+        );
 
         kernel.raw.load_matrix_sync(b, frag_b, b_idx, n);
 
@@ -191,11 +256,28 @@ pub fn forward_matmul(
         Ok(())
     })?;
 
-    let c_row = kernel.raw.def_var(DType::Simple(SimpleDType::U32), ValueState::Inline, Some(Op::Mul { a: tile_m, b: n }));
-    let c_col = kernel.raw.def_var(DType::Simple(SimpleDType::U32), ValueState::Inline, Some(Op::Add { a: c_row, b: tile_n }));
-    let c_idx = kernel.raw.def_var(DType::Simple(SimpleDType::U32), ValueState::Inline, Some(Op::Add { a: c_col, b: base }));
+    let c_row = kernel.raw.def_var(
+        DType::Simple(SimpleDType::U32),
+        ValueState::Inline,
+        Some(Op::Mul { a: tile_m, b: n }),
+    );
+    let c_col = kernel.raw.def_var(
+        DType::Simple(SimpleDType::U32),
+        ValueState::Inline,
+        Some(Op::Add {
+            a: c_row,
+            b: tile_n,
+        }),
+    );
+    let c_idx = kernel.raw.def_var(
+        DType::Simple(SimpleDType::U32),
+        ValueState::Inline,
+        Some(Op::Add { a: c_col, b: base }),
+    );
 
-    kernel.raw.store_matrix_sync(c, frag_c, c_idx, n, TensorLayout::RowMajor);
+    kernel
+        .raw
+        .store_matrix_sync(c, frag_c, c_idx, n, TensorLayout::RowMajor);
 
     Ok(deepest)
 }

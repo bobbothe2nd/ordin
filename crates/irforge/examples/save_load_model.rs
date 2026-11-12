@@ -1,12 +1,15 @@
 use irforge::{
     dispatch::{
-        CompilationOptions, DebugCompilationOptions, GpuContext, Graph, MetaBuilder, OptCompilationOptions, RawMetaBuf, SimpleDType,
-    }, io::BpatHeader, nn::{MEAN_SQUARED_ERROR, Optim, add, input, matmul},
+        CompilationOptions, DebugCompilationOptions, GpuContext, Graph, MetaBuilder,
+        OptCompilationOptions, RawMetaBuf, SimpleDType,
+    },
+    io::BpatHeader,
+    nn::{MEAN_SQUARED_ERROR, Optim, add, input, matmul},
 };
 use log::warn;
-use simplelog::*;
 use rand_core::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
+use simplelog::*;
 use std::{fs::OpenOptions, time::Instant};
 
 const MODEL_PATH: &str = "data/v2f32_test.bpat";
@@ -45,12 +48,16 @@ fn main() {
         .write(true)
         .open(LOG_PATH)
         .unwrap();
-    CombinedLogger::init(
-        vec![
-            TermLogger::new(LevelFilter::Warn, Config::default(), TerminalMode::Mixed, ColorChoice::Auto),
-            WriteLogger::new(LevelFilter::Debug, Config::default(), logs),
-        ]
-    ).unwrap();
+    CombinedLogger::init(vec![
+        TermLogger::new(
+            LevelFilter::Warn,
+            Config::default(),
+            TerminalMode::Mixed,
+            ColorChoice::Auto,
+        ),
+        WriteLogger::new(LevelFilter::Debug, Config::default(), logs),
+    ])
+    .unwrap();
 
     let mut meta = MetaBuilder::new();
     let m = meta.new_field();
@@ -91,7 +98,11 @@ fn main() {
         matmul(out, e);
     });
 
-    let meta_binding = RawMetaBuf { lr: LR, dims: &[M, N, K, H] }.to_binding();
+    let meta_binding = RawMetaBuf {
+        lr: LR,
+        dims: &[M, N, K, H],
+    }
+    .to_binding();
     let meta = meta.build(&meta_binding).unwrap();
 
     let saved = graph.compute_saved_nodes();

@@ -75,20 +75,17 @@ impl Index<Axis> for Block {
 impl Block {
     pub const ZERO3: Self = Self {
         dim3: [0; 3],
-        tile: [0; 3]
+        tile: [0; 3],
     };
     pub const UNIT: Self = Self {
         dim3: [1; 3],
-        tile: [1; 3]
+        tile: [1; 3],
     };
 
     #[inline]
     #[must_use]
     pub const fn new(dim3: [u32; 3]) -> Self {
-        Self {
-            dim3,
-            tile: [0; 3],
-        }
+        Self { dim3, tile: [0; 3] }
     }
 
     #[inline]

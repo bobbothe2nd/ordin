@@ -119,8 +119,14 @@ pub fn lower_backward(
 
                 let root_node = &graph.nodes[root];
 
-                let (mut kernel, base, gid) =
-                    gen_kernel(format!("back_{}", root_node.name).into_boxed_str(), meta, &params, [tile_size, tile_size, 1], root, root_node);
+                let (mut kernel, base, gid) = gen_kernel(
+                    format!("back_{}", root_node.name).into_boxed_str(),
+                    meta,
+                    &params,
+                    [tile_size, tile_size, 1],
+                    root,
+                    root_node,
+                );
 
                 let upstream = kernel.raw.def_var(
                     DType::Simple(root_node.dtype),

@@ -1,7 +1,13 @@
 use core::fmt::{self, Display, Write};
 
 use crate::{
-    dispatch::{CompilationOptions, backend::{Axis, DType, Op, SimpleDType, TensorLayout, ValueId, ValueState, kernel::RawKernel}}, errors::{Error, ErrorKind},
+    dispatch::{
+        CompilationOptions,
+        backend::{
+            Axis, DType, Op, SimpleDType, TensorLayout, ValueId, ValueState, kernel::RawKernel,
+        },
+    },
+    errors::{Error, ErrorKind},
 };
 
 impl SimpleDType {
@@ -57,12 +63,24 @@ impl DType {
     pub fn fmt_c(self) -> String {
         match self {
             Self::Simple(dtype) => dtype.fmt_c().to_string(),
-            Self::MmaA { dtype, m, n, k, layout } => format!(
+            Self::MmaA {
+                dtype,
+                m,
+                n,
+                k,
+                layout,
+            } => format!(
                 "fragment<matrix_a, {m}, {n}, {k}, {}, {}>",
                 dtype.fmt_c(),
                 layout.fmt_wmma(),
             ),
-            Self::MmaB { dtype, m, n, k, layout } => format!(
+            Self::MmaB {
+                dtype,
+                m,
+                n,
+                k,
+                layout,
+            } => format!(
                 "fragment<matrix_b, {m}, {n}, {k}, {}, {}>",
                 dtype.fmt_c(),
                 layout.fmt_wmma(),
@@ -105,7 +123,9 @@ impl DType {
             Self::Simple(dtype) => dtype.fmt_wgsl().map(Into::into),
             Self::MmaA { dtype, m, n, .. }
             | Self::MmaB { dtype, m, n, .. }
-            | Self::MmaAccum { dtype, m, n, .. } => Ok(format!("array<{},{}>", dtype.fmt_wgsl()?, m * n)),
+            | Self::MmaAccum { dtype, m, n, .. } => {
+                Ok(format!("array<{},{}>", dtype.fmt_wgsl()?, m * n))
+            }
         }
     }
 }
@@ -298,7 +318,12 @@ where
     Ok(())
 }
 
-pub fn render_val<F>(id: ValueId, kernel: &RawKernel, options: &CompilationOptions, process_op: F) -> Result<String, Error>
+pub fn render_val<F>(
+    id: ValueId,
+    kernel: &RawKernel,
+    options: &CompilationOptions,
+    process_op: F,
+) -> Result<String, Error>
 where
     F: FnOnce(&mut String, &Op, &mut usize, &CompilationOptions, &RawKernel) -> Result<(), Error>,
 {

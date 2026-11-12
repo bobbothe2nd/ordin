@@ -1,7 +1,9 @@
 use irforge::{
     dispatch::{
-        CompilationOptions, DebugCompilationOptions, GpuContext, Graph, MetaBuilder, OptCompilationOptions, RawMetaBuf, SimpleDType,
-    }, nn::{
+        CompilationOptions, DebugCompilationOptions, GpuContext, Graph, MetaBuilder,
+        OptCompilationOptions, RawMetaBuf, SimpleDType,
+    },
+    nn::{
         CROSS_ENTROPY, MEAN_SQUARED_ERROR, Optim, add, constant_f32, div, input, matmul, mul,
         softmax, sub,
     },
@@ -37,7 +39,11 @@ fn mul_add_forward_backward() {
         add(c, x);
     });
 
-    let meta_binding = RawMetaBuf { lr: 1e-3, dims: &[32, 32] }.to_binding();
+    let meta_binding = RawMetaBuf {
+        lr: 1e-3,
+        dims: &[32, 32],
+    }
+    .to_binding();
     let meta = meta.build(&meta_binding).unwrap();
 
     let saved = graph.compute_saved_nodes();
@@ -96,6 +102,21 @@ fn mul_add_forward_backward() {
 
 #[test]
 fn matmul_sub_softmax_forward_backward() {
+    use simplelog::*;
+
+    let logs =
+        std::fs::File::create("E:/fused_gpu/logs/div_const_softmax_forward_backward.log").unwrap();
+    CombinedLogger::init(vec![
+        TermLogger::new(
+            LevelFilter::Warn,
+            Config::default(),
+            TerminalMode::Mixed,
+            ColorChoice::Auto,
+        ),
+        WriteLogger::new(LevelFilter::Debug, Config::default(), logs),
+    ])
+    .unwrap();
+
     let mut meta = MetaBuilder::new();
     let m = meta.new_field();
     let n = meta.new_field();
@@ -112,7 +133,7 @@ fn matmul_sub_softmax_forward_backward() {
     let options = CompilationOptions {
         target: ctx.detect_target(),
         opt: OptCompilationOptions::default(),
-        debug: DebugCompilationOptions::empty(),
+        debug: DebugCompilationOptions::PRETTY_PRINT_IR | DebugCompilationOptions::SOFT_MMA,
     };
 
     graph.set_options(options);
@@ -126,7 +147,11 @@ fn matmul_sub_softmax_forward_backward() {
         softmax(s);
     });
 
-    let meta_binding = RawMetaBuf { lr: 1e-3, dims: &[16, 64, 32] }.to_binding();
+    let meta_binding = RawMetaBuf {
+        lr: 1e-3,
+        dims: &[16, 64, 32],
+    }
+    .to_binding();
     let meta = meta.build(&meta_binding).unwrap();
 
     let saved = graph.compute_saved_nodes();
@@ -189,21 +214,11 @@ fn matmul_sub_softmax_forward_backward() {
 
 #[test]
 fn div_const_softmax_forward_backward() {
-    use simplelog::*;
-
     let mut meta = MetaBuilder::new();
     let m = meta.new_field();
     let n = meta.new_field();
 
     let state = Optim::sgd().state;
-
-    let logs = std::fs::File::create("E:/fused_gpu/logs/div_const_softmax_forward_backward.log").unwrap();
-    CombinedLogger::init(
-        vec![
-            TermLogger::new(LevelFilter::Warn, Config::default(), TerminalMode::Mixed, ColorChoice::Auto),
-            WriteLogger::new(LevelFilter::Debug, Config::default(), logs),
-        ]
-    ).unwrap();
 
     let mut graph = Graph::new(CROSS_ENTROPY, Optim::sgd().lower);
 
@@ -214,7 +229,7 @@ fn div_const_softmax_forward_backward() {
     let options = CompilationOptions {
         target: ctx.detect_target(),
         opt: OptCompilationOptions::default(),
-        debug: DebugCompilationOptions::PRETTY_PRINT_IR,
+        debug: DebugCompilationOptions::PRETTY_PRINT_IR | DebugCompilationOptions::SOFT_MMA,
     };
 
     graph.set_options(options);
@@ -227,7 +242,11 @@ fn div_const_softmax_forward_backward() {
         add(soft, two);
     });
 
-    let meta_binding = RawMetaBuf { lr: 1e-3, dims: &[16, 32] }.to_binding();
+    let meta_binding = RawMetaBuf {
+        lr: 1e-3,
+        dims: &[16, 32],
+    }
+    .to_binding();
     let meta = meta.build(&meta_binding).unwrap();
 
     let saved = graph.compute_saved_nodes();
@@ -268,7 +287,6 @@ fn div_const_softmax_forward_backward() {
     let grad_tensors = &saved_tensors.grad_tensors;
 
     ctx.download(out_tensor, &mut dst, 0).unwrap();
-    println!("{dst:?}");
     assert!(dst.iter().all(|x| *x == 2.0 + (1.0 / 32.0)));
 
     ctx.download(&grad_tensors[0], &mut dst, 0).unwrap();
@@ -314,7 +332,11 @@ fn matmul_add_forward_backward() {
         add(x, c);
     });
 
-    let meta_binding = RawMetaBuf { lr: 1e-3, dims: &[M, N, K] }.to_binding();
+    let meta_binding = RawMetaBuf {
+        lr: 1e-3,
+        dims: &[M, N, K],
+    }
+    .to_binding();
     let meta = meta.build(&meta_binding).unwrap();
 
     let saved = graph.compute_saved_nodes();
@@ -439,7 +461,11 @@ fn matmul_chain3_forward_backward() {
         add(z, e);
     });
 
-    let meta_binding = RawMetaBuf { lr: 1e-3, dims: &[M, N, K, H] }.to_binding();
+    let meta_binding = RawMetaBuf {
+        lr: 1e-3,
+        dims: &[M, N, K, H],
+    }
+    .to_binding();
     let meta = meta.build(&meta_binding).unwrap();
 
     let saved = graph.compute_saved_nodes();
@@ -582,7 +608,11 @@ fn matmul_sub_forward_backward() {
         sub(x, y);
     });
 
-    let meta_binding = RawMetaBuf { lr: 1e-3, dims: &[M, N, K] }.to_binding();
+    let meta_binding = RawMetaBuf {
+        lr: 1e-3,
+        dims: &[M, N, K],
+    }
+    .to_binding();
     let meta = meta.build(&meta_binding).unwrap();
 
     let saved = graph.compute_saved_nodes();

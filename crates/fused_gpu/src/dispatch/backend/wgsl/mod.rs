@@ -1,7 +1,7 @@
 use crate::{
     dispatch::{
-        CompilationOptions, GpuBackend, GpuBufferBackend,
-        GpuKernelBackend, TargetCompilationOptions, TargetFlags,
+        CompilationOptions, GpuBackend, GpuBufferBackend, GpuKernelBackend,
+        TargetCompilationOptions, TargetFlags,
         backend::{
             MetaId, NodeId, Param,
             kernel::{Dependencies, RawKernel, Redirect, remap::eval_dependency_order},
@@ -15,7 +15,7 @@ use core::range::Range;
 use std::{num::NonZeroU8, vec::Vec};
 
 pub use wgpu::{
-    BackendOptions, Backends, BindGroup, BindGroupDescriptor, BindGroupEntry,
+    AdapterInfo, BackendOptions, Backends, BindGroup, BindGroupDescriptor, BindGroupEntry,
     BindGroupLayoutDescriptor, BindGroupLayoutEntry, BindingType, Buffer, BufferBindingType,
     BufferDescriptor, BufferUsages, CommandBuffer, CommandEncoder, CommandEncoderDescriptor,
     ComputePass, ComputePassDescriptor, ComputePipeline, ComputePipelineDescriptor, Device,
@@ -25,7 +25,7 @@ pub use wgpu::{
     InstanceFlags, Limits, MemoryBudgetThresholds, MemoryHints, NoopBackendOptions,
     PipelineCompilationOptions, PipelineLayout, PipelineLayoutDescriptor, PollStatus, PollType,
     PowerPreference, Queue, RequestAdapterError, RequestAdapterOptions, ShaderModuleDescriptor,
-    ShaderSource, ShaderStages, SubmissionIndex, Trace, AdapterInfo,
+    ShaderSource, ShaderStages, SubmissionIndex, Trace,
     util::{BufferInitDescriptor, DeviceExt},
 };
 
@@ -90,7 +90,11 @@ impl GpuContext {
 
         let adapter_limits = adapter.limits();
 
-        let AdapterInfo { subgroup_min_size, subgroup_max_size, .. } = adapter.get_info();
+        let AdapterInfo {
+            subgroup_min_size,
+            subgroup_max_size,
+            ..
+        } = adapter.get_info();
 
         let (device, queue) = match adapter
             .request_device(&DeviceDescriptor {
@@ -121,7 +125,11 @@ impl GpuContext {
                 })?,
         };
 
-        Ok(Self { device, queue, subgroup: (subgroup_min_size..subgroup_max_size).into() })
+        Ok(Self {
+            device,
+            queue,
+            subgroup: (subgroup_min_size..subgroup_max_size).into(),
+        })
     }
 }
 
@@ -329,11 +337,7 @@ impl GpuBackend for GpuContext {
         };
         let pipeline_layout = self.device.create_pipeline_layout(&desc);
 
-        let source = generate::generate_wgsl(
-            src,
-            params,
-            options,
-        )?;
+        let source = generate::generate_wgsl(src, params, options)?;
 
         let shader = self.device.create_shader_module(ShaderModuleDescriptor {
             label: None,

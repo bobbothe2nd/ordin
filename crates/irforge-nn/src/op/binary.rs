@@ -1,9 +1,13 @@
 use fused_gpu::{
     dispatch::{
-        CompilationOptions, backend::{
-            DType, DispatchOptions, Graph, GraphOp, GraphOpFlags, MetaId, Node, NodeId, Op, Param, ParamId, ValueId, ValueState, kernel::{LinkedKernel, NodeInput, SaveIndicator},
+        CompilationOptions,
+        backend::{
+            DType, DispatchOptions, Graph, GraphOp, GraphOpFlags, MetaId, Node, NodeId, Op, Param,
+            ParamId, ValueId, ValueState,
+            kernel::{LinkedKernel, NodeInput, SaveIndicator},
         },
-    }, errors::{Error, ErrorKind, GraphErrorContext},
+    },
+    errors::{Error, ErrorKind, GraphErrorContext},
 };
 use std::{format, vec, vec::Vec};
 
@@ -211,7 +215,10 @@ pub fn add(graph: &mut Graph, a: NodeId, b: NodeId) -> NodeId {
             save: |_, _, _, _| {},
             valid_shape: valid_binary,
             arity: 2,
-            flags: GraphOpFlags::STABLE_ITER | GraphOpFlags::AUTO_SAVE | GraphOpFlags::COMPUTES_GID | GraphOpFlags::SAVE_OUTPUT,
+            flags: GraphOpFlags::STABLE_ITER
+                | GraphOpFlags::AUTO_SAVE
+                | GraphOpFlags::COMPUTES_GID
+                | GraphOpFlags::SAVE_OUTPUT,
             valid_dispatch: DispatchOptions::Any,
         },
         inputs: vec![a, b].into_boxed_slice(),
@@ -415,7 +422,10 @@ pub fn mul(graph: &mut Graph, a: NodeId, b: NodeId) -> NodeId {
             save: save_mul_div,
             valid_shape: valid_binary,
             arity: 2,
-            flags: GraphOpFlags::STABLE_ITER | GraphOpFlags::AUTO_SAVE | GraphOpFlags::COMPUTES_GID | GraphOpFlags::SAVE_OUTPUT,
+            flags: GraphOpFlags::STABLE_ITER
+                | GraphOpFlags::AUTO_SAVE
+                | GraphOpFlags::COMPUTES_GID
+                | GraphOpFlags::SAVE_OUTPUT,
             valid_dispatch: DispatchOptions::Any,
         },
         inputs: vec![a, b].into_boxed_slice(),
@@ -601,7 +611,10 @@ pub fn sub(graph: &mut Graph, a: NodeId, b: NodeId) -> NodeId {
             save: |_, _, _, _| {},
             valid_shape: valid_binary,
             arity: 2,
-            flags: GraphOpFlags::STABLE_ITER | GraphOpFlags::AUTO_SAVE | GraphOpFlags::COMPUTES_GID | GraphOpFlags::SAVE_OUTPUT,
+            flags: GraphOpFlags::STABLE_ITER
+                | GraphOpFlags::AUTO_SAVE
+                | GraphOpFlags::COMPUTES_GID
+                | GraphOpFlags::SAVE_OUTPUT,
             valid_dispatch: DispatchOptions::Any,
         },
         inputs: vec![a, b].into_boxed_slice(),
@@ -830,7 +843,10 @@ pub fn div(graph: &mut Graph, a: NodeId, b: NodeId) -> NodeId {
             save: save_mul_div,
             valid_shape: valid_binary,
             arity: 2,
-            flags: GraphOpFlags::STABLE_ITER | GraphOpFlags::AUTO_SAVE | GraphOpFlags::COMPUTES_GID | GraphOpFlags::SAVE_OUTPUT,
+            flags: GraphOpFlags::STABLE_ITER
+                | GraphOpFlags::AUTO_SAVE
+                | GraphOpFlags::COMPUTES_GID
+                | GraphOpFlags::SAVE_OUTPUT,
             valid_dispatch: DispatchOptions::Any,
         },
         inputs: vec![a, b].into_boxed_slice(),

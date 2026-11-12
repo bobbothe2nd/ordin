@@ -1,7 +1,9 @@
 use irforge::{
     dispatch::{
-        CompilationOptions, DebugCompilationOptions, GpuContext, Graph, MetaBuilder, OptCompilationOptions, RawMetaBuf, SimpleDType,
-    }, nn::{MEAN_SQUARED_ERROR, Optim, add, input, mul},
+        CompilationOptions, DebugCompilationOptions, GpuContext, Graph, MetaBuilder,
+        OptCompilationOptions, RawMetaBuf, SimpleDType,
+    },
+    nn::{MEAN_SQUARED_ERROR, Optim, add, input, mul},
 };
 
 #[test]
@@ -34,7 +36,11 @@ fn mul_add_optim() {
         add(c, x);
     });
 
-    let meta_binding = RawMetaBuf { lr: 1e-3, dims: &[32, 32] }.to_binding();
+    let meta_binding = RawMetaBuf {
+        lr: 1e-3,
+        dims: &[32, 32],
+    }
+    .to_binding();
     let meta = meta.build(&meta_binding).unwrap();
 
     let saved = graph.compute_saved_nodes();
@@ -131,7 +137,11 @@ fn mul_add_separate_optim() {
         add(c, x);
     });
 
-    let meta_binding = RawMetaBuf { lr: 1e-3, dims: &[32, 32] }.to_binding();
+    let meta_binding = RawMetaBuf {
+        lr: 1e-3,
+        dims: &[32, 32],
+    }
+    .to_binding();
     let meta = meta.build(&meta_binding).unwrap();
 
     let saved = graph.compute_saved_nodes();

@@ -1,7 +1,7 @@
 use crate::{
     backend::SavedNodes,
     dispatch::{CompilationOptions, KernelGroup, LossType, Node, OptimType, SimpleDType},
-    ir::{Metadata, EdgeId, MetaId, NodeId},
+    ir::{EdgeId, MetaId, Metadata, NodeId},
     tensor::{bf16, f16},
 };
 use briny::raw::{alloc::cast_vec, cast::cast_slice};
@@ -10,7 +10,8 @@ use core::{
     ops::{Index, IndexMut},
 };
 use fused_gpu::{
-    dispatch::{backend::Graph as InnerGraph}, errors::{Error, GraphErrorContext},
+    dispatch::backend::Graph as InnerGraph,
+    errors::{Error, GraphErrorContext},
 };
 use std::rc::Rc;
 
@@ -112,10 +113,12 @@ impl Graph {
     ) -> Result<KernelGroup, Error<GraphErrorContext>> {
         self.inner_mut().rebuild_outputs();
 
-        let ir = self.inner()
-            .lower(meta.0, &saved.0)?;
+        let ir = self.inner().lower(meta.0, &saved.0)?;
         let options = self.inner().options.unwrap();
-        Ok(KernelGroup { inner: Box::new(ir), options })
+        Ok(KernelGroup {
+            inner: Box::new(ir),
+            options,
+        })
     }
 
     pub fn define<F, R>(&mut self, f: F) -> R

@@ -1,8 +1,10 @@
 use gpu_telemetry::monitor::{GpuMonitor, telemetry::Telemetry};
 use irforge::{
     dispatch::{
-        CompilationOptions, DebugCompilationOptions, GpuContext, Graph, MetaBuilder, OptCompilationOptions, RawMetaBuf, Schedule, SimpleDType,
-    }, nn::{MEAN_SQUARED_ERROR, Optim, add, input, matmul},
+        CompilationOptions, DebugCompilationOptions, GpuContext, Graph, MetaBuilder,
+        OptCompilationOptions, RawMetaBuf, Schedule, SimpleDType,
+    },
+    nn::{MEAN_SQUARED_ERROR, Optim, add, input, matmul},
 };
 use std::time::{Duration, Instant};
 
@@ -85,7 +87,11 @@ fn main() {
         add(z, e);
     });
 
-    let meta_binding = RawMetaBuf { lr: 1e-3, dims: &[M, N, K, H] }.to_binding();
+    let meta_binding = RawMetaBuf {
+        lr: 1e-3,
+        dims: &[M, N, K, H],
+    }
+    .to_binding();
     let meta = meta.build(&meta_binding).unwrap();
 
     let saved = graph.compute_saved_nodes();

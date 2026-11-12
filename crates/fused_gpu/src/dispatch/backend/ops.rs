@@ -395,7 +395,9 @@ impl Op {
             | Self::ShrAssign { val, .. }
             | Self::SubAssign { val, .. }
             | Self::OverwriteVar { val, .. } => val == &value_id,
-            Self::ForLoopBegin { index, end, step } => index == &value_id || end == &value_id || step == &value_id,
+            Self::ForLoopBegin { index, end, step } => {
+                index == &value_id || end == &value_id || step == &value_id
+            }
             Self::IfBegin { cond } => cond == &value_id,
             Self::ParamAccum { index, val, .. }
             | Self::ParamDiv { index, val, .. }
@@ -413,7 +415,9 @@ impl Op {
             | Self::SharedSub { index, val, .. } => index == &value_id || val == &value_id,
             Self::ParamLoad { index, .. } | Self::SharedLoad { index, .. } => index == &value_id,
             Self::Select { cond, a, b } => cond == &value_id || a == &value_id || b == &value_id,
-            Self::MmaSync { acc, a, b, c } => a == &value_id || b == &value_id || c == &value_id || acc == &value_id,
+            Self::MmaSync { acc, a, b, c } => {
+                a == &value_id || b == &value_id || c == &value_id || acc == &value_id
+            }
             Self::Index { pointer, index } => pointer == &value_id || index == &value_id,
             Self::LoadMatrixSync {
                 frag,
@@ -608,7 +612,9 @@ impl Op {
             | Self::Sub { a, b }
             | Self::Shl { a, b }
             | Self::Shr { a, b } => not_mut(*a, kernel) && not_mut(*b, kernel),
-            Self::Fma { a, b, c } => not_mut(*a, kernel) && not_mut(*b, kernel) && not_mut(*c, kernel),
+            Self::Fma { a, b, c } => {
+                not_mut(*a, kernel) && not_mut(*b, kernel) && not_mut(*c, kernel)
+            }
             Self::AddAssign { val, id }
             | Self::DivAssign { val, id }
             | Self::MulAssign { val, id }
@@ -616,7 +622,9 @@ impl Op {
             | Self::ShrAssign { val, id }
             | Self::SubAssign { val, id }
             | Self::OverwriteVar { val, id } => not_mut(*val, kernel) && not_mut(*id, kernel),
-            Self::ForLoopBegin { index, end, step } => not_mut(*index, kernel) && not_mut(*end, kernel) && not_mut(*step, kernel),
+            Self::ForLoopBegin { index, end, step } => {
+                not_mut(*index, kernel) && not_mut(*end, kernel) && not_mut(*step, kernel)
+            }
             Self::IfBegin { cond } => not_mut(*cond, kernel),
             Self::ParamAccum { index, val, .. }
             | Self::ParamDiv { index, val, .. }
@@ -631,13 +639,21 @@ impl Op {
             | Self::SharedShl { index, val, .. }
             | Self::SharedShr { index, val, .. }
             | Self::SharedStore { index, val, .. }
-            | Self::SharedSub { index, val, .. } => not_mut(*index, kernel) && not_mut(*val, kernel),
-            Self::ParamLoad { index, .. } | Self::SharedLoad { index, .. } => not_mut(*index, kernel),
-            Self::Select { cond, a, b } => not_mut(*cond, kernel) && not_mut(*a, kernel) && not_mut(*b, kernel),
-            Self::MmaSync { a, b, c, acc } => not_mut(*a, kernel)
-                && not_mut(*b, kernel)
-                && not_mut(*c, kernel)
-                && not_mut(*acc, kernel),
+            | Self::SharedSub { index, val, .. } => {
+                not_mut(*index, kernel) && not_mut(*val, kernel)
+            }
+            Self::ParamLoad { index, .. } | Self::SharedLoad { index, .. } => {
+                not_mut(*index, kernel)
+            }
+            Self::Select { cond, a, b } => {
+                not_mut(*cond, kernel) && not_mut(*a, kernel) && not_mut(*b, kernel)
+            }
+            Self::MmaSync { a, b, c, acc } => {
+                not_mut(*a, kernel)
+                    && not_mut(*b, kernel)
+                    && not_mut(*c, kernel)
+                    && not_mut(*acc, kernel)
+            }
             Self::Index { pointer, index } => not_mut(*pointer, kernel) && not_mut(*index, kernel),
             Self::LoadMatrixSync {
                 frag,

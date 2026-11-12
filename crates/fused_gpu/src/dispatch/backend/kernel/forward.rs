@@ -1,11 +1,16 @@
 use crate::{
     dispatch::{
-        CompilationOptions, backend::{
-            Axis, DType, DispatchOptions, Graph, GraphOp, GraphOpFlags, Metadata, NodeId, Op, Param, ParamId, ParamTy, SimpleDType, ValueId, ValueState, kernel::{
+        CompilationOptions,
+        backend::{
+            Axis, DType, DispatchOptions, Graph, GraphOp, GraphOpFlags, Metadata, NodeId, Op,
+            Param, ParamId, ParamTy, SimpleDType, ValueId, ValueState,
+            kernel::{
                 Dependencies, KernelsChained, LinkedKernel, NodeInput, RawKernel, SaveIndicator,
             },
         },
-    }, errors::{Error, ErrorKind}, tensor::Block,
+    },
+    errors::{Error, ErrorKind},
+    tensor::Block,
 };
 use core::cmp::Ordering;
 use std::{vec, vec::Vec};

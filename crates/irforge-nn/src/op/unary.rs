@@ -1,9 +1,13 @@
 use fused_gpu::{
     dispatch::{
-        CompilationOptions, backend::{
-            DType, DispatchOptions, Graph, GraphOp, GraphOpFlags, Node, NodeId, Op, Param, ParamId, SimpleDType, ValueId, ValueState, kernel::{LinkedKernel, NodeInput, SaveIndicator},
+        CompilationOptions,
+        backend::{
+            DType, DispatchOptions, Graph, GraphOp, GraphOpFlags, Node, NodeId, Op, Param, ParamId,
+            SimpleDType, ValueId, ValueState,
+            kernel::{LinkedKernel, NodeInput, SaveIndicator},
         },
-    }, errors::{Error, ErrorKind, GraphErrorContext},
+    },
+    errors::{Error, ErrorKind, GraphErrorContext},
 };
 
 use std::{format, vec, vec::Vec};
@@ -243,7 +247,10 @@ pub fn log(graph: &mut Graph, x: NodeId) -> NodeId {
             save: save_unary,
             valid_shape: valid_unary,
             arity: 1,
-            flags: GraphOpFlags::STABLE_ITER | GraphOpFlags::AUTO_SAVE | GraphOpFlags::COMPUTES_GID | GraphOpFlags::SAVE_OUTPUT,
+            flags: GraphOpFlags::STABLE_ITER
+                | GraphOpFlags::AUTO_SAVE
+                | GraphOpFlags::COMPUTES_GID
+                | GraphOpFlags::SAVE_OUTPUT,
             valid_dispatch: DispatchOptions::Any,
         },
         outputs: Vec::new(),
@@ -299,7 +306,10 @@ pub fn tanh(graph: &mut Graph, x: NodeId) -> NodeId {
             save: save_unary,
             valid_shape: valid_unary,
             arity: 1,
-            flags: GraphOpFlags::STABLE_ITER | GraphOpFlags::AUTO_SAVE | GraphOpFlags::COMPUTES_GID | GraphOpFlags::SAVE_OUTPUT,
+            flags: GraphOpFlags::STABLE_ITER
+                | GraphOpFlags::AUTO_SAVE
+                | GraphOpFlags::COMPUTES_GID
+                | GraphOpFlags::SAVE_OUTPUT,
             valid_dispatch: DispatchOptions::Any,
         },
         outputs: Vec::new(),
@@ -403,7 +413,10 @@ pub fn elu(graph: &mut Graph, x: NodeId) -> NodeId {
             save: save_unary,
             valid_shape: valid_unary,
             arity: 1,
-            flags: GraphOpFlags::STABLE_ITER | GraphOpFlags::AUTO_SAVE | GraphOpFlags::COMPUTES_GID | GraphOpFlags::SAVE_OUTPUT,
+            flags: GraphOpFlags::STABLE_ITER
+                | GraphOpFlags::AUTO_SAVE
+                | GraphOpFlags::COMPUTES_GID
+                | GraphOpFlags::SAVE_OUTPUT,
             valid_dispatch: DispatchOptions::Any,
         },
         outputs: Vec::new(),
@@ -456,7 +469,10 @@ pub fn relu(graph: &mut Graph, x: NodeId) -> NodeId {
             save: save_unary,
             valid_shape: valid_unary,
             arity: 1,
-            flags: GraphOpFlags::STABLE_ITER | GraphOpFlags::AUTO_SAVE | GraphOpFlags::COMPUTES_GID | GraphOpFlags::SAVE_OUTPUT,
+            flags: GraphOpFlags::STABLE_ITER
+                | GraphOpFlags::AUTO_SAVE
+                | GraphOpFlags::COMPUTES_GID
+                | GraphOpFlags::SAVE_OUTPUT,
             valid_dispatch: DispatchOptions::Any,
         },
         outputs: Vec::new(),
@@ -688,7 +704,9 @@ pub fn gelu(graph: &mut Graph, x: NodeId) -> NodeId {
             save: save_unary,
             valid_shape: valid_unary,
             arity: 1,
-            flags: GraphOpFlags::STABLE_ITER | GraphOpFlags::NO_RECOMPUTE | GraphOpFlags::COMPUTES_GID,
+            flags: GraphOpFlags::STABLE_ITER
+                | GraphOpFlags::NO_RECOMPUTE
+                | GraphOpFlags::COMPUTES_GID,
             valid_dispatch: DispatchOptions::Any,
         },
         outputs: Vec::new(),
@@ -726,7 +744,10 @@ pub fn exp(graph: &mut Graph, x: NodeId) -> NodeId {
             save: save_unary,
             valid_shape: valid_unary,
             arity: 1,
-            flags: GraphOpFlags::STABLE_ITER | GraphOpFlags::AUTO_SAVE | GraphOpFlags::COMPUTES_GID | GraphOpFlags::SAVE_OUTPUT,
+            flags: GraphOpFlags::STABLE_ITER
+                | GraphOpFlags::AUTO_SAVE
+                | GraphOpFlags::COMPUTES_GID
+                | GraphOpFlags::SAVE_OUTPUT,
             valid_dispatch: DispatchOptions::Any,
         },
         outputs: Vec::new(),
@@ -793,7 +814,10 @@ pub fn abs(graph: &mut Graph, x: NodeId) -> NodeId {
             save: save_unary,
             valid_shape: valid_unary,
             arity: 1,
-            flags: GraphOpFlags::STABLE_ITER | GraphOpFlags::AUTO_SAVE | GraphOpFlags::COMPUTES_GID | GraphOpFlags::SAVE_OUTPUT,
+            flags: GraphOpFlags::STABLE_ITER
+                | GraphOpFlags::AUTO_SAVE
+                | GraphOpFlags::COMPUTES_GID
+                | GraphOpFlags::SAVE_OUTPUT,
             valid_dispatch: DispatchOptions::Any,
         },
         outputs: Vec::new(),
@@ -832,7 +856,10 @@ pub fn neg(graph: &mut Graph, x: NodeId) -> NodeId {
             },
             valid_shape: valid_unary,
             arity: 1,
-            flags: GraphOpFlags::STABLE_ITER | GraphOpFlags::AUTO_SAVE | GraphOpFlags::COMPUTES_GID | GraphOpFlags::SAVE_OUTPUT,
+            flags: GraphOpFlags::STABLE_ITER
+                | GraphOpFlags::AUTO_SAVE
+                | GraphOpFlags::COMPUTES_GID
+                | GraphOpFlags::SAVE_OUTPUT,
             valid_dispatch: DispatchOptions::Any,
         },
         outputs: Vec::new(),

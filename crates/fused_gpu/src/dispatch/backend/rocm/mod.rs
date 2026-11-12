@@ -7,7 +7,7 @@ pub use roc::{
         callback::Callback,
         device::Device,
         graph::{ExecGraph, Graph, GraphInstantiateFlags, KernelParams, Node},
-        memory::{Buffer, HostSlice, HostBuffer},
+        memory::{Buffer, HostBuffer, HostSlice},
         module::{Func, LaunchConfig},
         stream::HipStream,
     },
@@ -18,7 +18,7 @@ pub use roc::{
     shared::{GfxVersion, MatrixKind},
 };
 
-use core::{marker::PhantomData, ptr::from_ref, num::NonZeroU8};
+use core::{marker::PhantomData, num::NonZeroU8, ptr::from_ref};
 use std::rc::Rc;
 
 use briny::raw::cast::slice_to_bytes;
@@ -69,10 +69,7 @@ impl GpuContext {
         )?;
         let stream = map_err!(HipStream::create(), "failed to get GFX version from device")?;
 
-        Ok(Self {
-            arch,
-            stream,
-        })
+        Ok(Self { arch, stream })
     }
 }
 
@@ -94,10 +91,7 @@ impl GpuBackend for GpuContext {
     }
 
     fn alloc_init(&self, data: &[u8]) -> Result<Self::Buffer, Error> {
-        let host_buf = map_err!(
-            self.stream.host_slice(data),
-            "failed to map host buffer"
-        )?;
+        let host_buf = map_err!(self.stream.host_slice(data), "failed to map host buffer")?;
 
         let buf = self.alloc(data.len() as u32)?;
 
@@ -112,10 +106,7 @@ impl GpuBackend for GpuContext {
     fn alloc_meta(&self, data: &[u32]) -> Result<Self::MetaBuf, Error> {
         let data = slice_to_bytes(data);
 
-        let host_buf = map_err!(
-            self.stream.host_slice(data),
-            "failed to map host slice"
-        )?;
+        let host_buf = map_err!(self.stream.host_slice(data), "failed to map host slice")?;
 
         let buf = self.alloc(data.len() as u32)?;
 
@@ -170,16 +161,16 @@ impl GpuBackend for GpuContext {
 
         let subgroup_size = NonZeroU8::new(capabilities.wave_size as u8);
 
-        TargetCompilationOptions { flags, subgroup_size }
+        TargetCompilationOptions {
+            flags,
+            subgroup_size,
+        }
     }
 
     fn download(&self, buffer: &Self::Buffer, out: &mut [u8], src_off: u32) -> Result<(), Error> {
         let len = out.len();
 
-        let mut host_buf = map_err!(
-            self.stream.host_slice_mut(out),
-            "failed to map host buffer"
-        )?;
+        let mut host_buf = map_err!(self.stream.host_slice_mut(out), "failed to map host buffer")?;
 
         map_err!(
             buffer.copy_to_host(&mut host_buf, src_off, 0, len as u32),
@@ -385,10 +376,7 @@ impl GpuBackend for GpuContext {
     }
 
     fn upload(&self, buffer: &Self::Buffer, data: &[u8], dst_off: u32) -> Result<(), Error> {
-        let host_buf = map_err!(
-            self.stream.host_slice(data),
-            "failed to map host buffer"
-        )?;
+        let host_buf = map_err!(self.stream.host_slice(data), "failed to map host buffer")?;
 
         map_err!(
             host_buf.copy_to_dev(buffer, 0, dst_off, data.len() as u32),

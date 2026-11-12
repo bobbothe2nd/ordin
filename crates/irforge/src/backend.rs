@@ -27,7 +27,8 @@ use crate::{
     dispatch::{
         AllocTensors, CompilationOptions, GpuBackend, GpuBufferBackend, GpuKernelBackend,
         GpuKernelGroup, KernelGroup, OptimState, Param, TargetCompilationOptions,
-    }, graph::Graph,
+    },
+    graph::Graph,
 };
 
 pub struct SavedNodes(pub(crate) Box<[SaveIndicator]>);
@@ -252,10 +253,7 @@ impl<B: GpuBackend> GpuContext<B> {
     }
 
     #[inline]
-    pub fn compile<'a>(
-        &self,
-        ir: &'a KernelGroup,
-    ) -> Result<GpuKernelGroup<'a, B>, Error> {
+    pub fn compile<'a>(&self, ir: &'a KernelGroup) -> Result<GpuKernelGroup<'a, B>, Error> {
         self.0.compile(&ir.inner, &ir.options)
     }
 

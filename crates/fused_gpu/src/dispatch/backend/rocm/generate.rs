@@ -8,7 +8,8 @@ use crate::{
             codegen::{self, def_var_c, newline},
             kernel::RawKernel,
         },
-    }, errors::Error,
+    },
+    errors::Error,
 };
 
 use core::fmt::Write;
@@ -384,7 +385,11 @@ fn process_op(
         }
 
         Op::ParamLoad { param, index } => {
-            let _ = write!(out, "param{param}[{}]", render_val(*index, kernel, options)?);
+            let _ = write!(
+                out,
+                "param{param}[{}]",
+                render_val(*index, kernel, options)?
+            );
         }
 
         Op::Not { cond } => {
@@ -409,11 +414,7 @@ fn process_op(
             );
         }
 
-        Op::ParamStore {
-            param,
-            index,
-            val,
-        } => {
+        Op::ParamStore { param, index, val } => {
             let _ = write!(
                 out,
                 "param{param}[{}] = {};",
@@ -422,11 +423,7 @@ fn process_op(
             );
         }
 
-        Op::ParamAccum {
-            param,
-            index,
-            val,
-        } => {
+        Op::ParamAccum { param, index, val } => {
             let _ = write!(
                 out,
                 "param{param}[{}] += {};",
@@ -435,11 +432,7 @@ fn process_op(
             );
         }
 
-        Op::ParamMul {
-            param,
-            index,
-            val,
-        } => {
+        Op::ParamMul { param, index, val } => {
             let _ = write!(
                 out,
                 "param{param}[{}] *= {};",
@@ -448,11 +441,7 @@ fn process_op(
             );
         }
 
-        Op::ParamDiv {
-            param,
-            index,
-            val,
-        } => {
+        Op::ParamDiv { param, index, val } => {
             let _ = write!(
                 out,
                 "param{param}[{}] /= {};",
@@ -461,11 +450,7 @@ fn process_op(
             );
         }
 
-        Op::ParamSub {
-            param,
-            index,
-            val,
-        } => {
+        Op::ParamSub { param, index, val } => {
             let _ = write!(
                 out,
                 "param{param}[{}] -= {};",
@@ -474,11 +459,7 @@ fn process_op(
             );
         }
 
-        Op::ParamShl {
-            param,
-            index,
-            val,
-        } => {
+        Op::ParamShl { param, index, val } => {
             let _ = write!(
                 out,
                 "param{param}[{}] <<= {};",
@@ -487,11 +468,7 @@ fn process_op(
             );
         }
 
-        Op::ParamShr {
-            param,
-            index,
-            val,
-        } => {
+        Op::ParamShr { param, index, val } => {
             let _ = write!(
                 out,
                 "param{param}[{}] >>= {};",
@@ -683,6 +660,10 @@ fn process_op(
     Ok(())
 }
 
-fn render_val(id: ValueId, kernel: &RawKernel, options: &CompilationOptions) -> Result<String, Error> {
+fn render_val(
+    id: ValueId,
+    kernel: &RawKernel,
+    options: &CompilationOptions,
+) -> Result<String, Error> {
     codegen::render_val(id, kernel, options, process_op)
 }

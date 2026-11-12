@@ -1,9 +1,13 @@
 use fused_gpu::{
     dispatch::{
-        CompilationOptions, DebugCompilationOptions, TargetFlags, backend::{
-            Axis, DType, DispatchOptions, Graph, GraphOp, GraphOpFlags, Node, NodeId, Op, Param, ParamId, SimpleDType, ValueId, ValueState, kernel::{LinkedKernel, NodeInput, SaveIndicator},
+        CompilationOptions, DebugCompilationOptions, TargetFlags,
+        backend::{
+            Axis, DType, DispatchOptions, Graph, GraphOp, GraphOpFlags, Node, NodeId, Op, Param,
+            ParamId, SimpleDType, ValueId, ValueState,
+            kernel::{LinkedKernel, NodeInput, SaveIndicator},
         },
-    }, errors::{Error, ErrorKind, GraphErrorContext},
+    },
+    errors::{Error, ErrorKind, GraphErrorContext},
 };
 use std::{format, vec, vec::Vec};
 
@@ -269,7 +273,11 @@ pub fn matmul(graph: &mut Graph, a: NodeId, b: NodeId) -> NodeId {
     let last_idx = shape.len() - 1;
     shape[last_idx] = graph.nodes[b].shape[last_idx];
 
-    let is_wmma = graph.options.is_some_and(|options| options.target.subgroup_size.is_some() && (options.target.flags.contains(TargetFlags::LIN_ACC) || options.debug.contains(DebugCompilationOptions::SOFT_MMA)));
+    let is_wmma = graph.options.is_some_and(|options| {
+        options.target.subgroup_size.is_some()
+            && (options.target.flags.contains(TargetFlags::LIN_ACC)
+                || options.debug.contains(DebugCompilationOptions::SOFT_MMA))
+    });
 
     graph.push_node(Node {
         name: "matmul".into(),
@@ -280,11 +288,14 @@ pub fn matmul(graph: &mut Graph, a: NodeId, b: NodeId) -> NodeId {
                 generic_matmul_recursive
             },
             arity: 2,
-            flags: GraphOpFlags::NEEDS_DIMS | GraphOpFlags::NO_RECOMPUTE | GraphOpFlags::SAVE_OUTPUT | if is_wmma {
-                GraphOpFlags::empty()
-            } else {
-                GraphOpFlags::AUTO_SAVE | GraphOpFlags::COMPUTES_GID
-            },
+            flags: GraphOpFlags::NEEDS_DIMS
+                | GraphOpFlags::NO_RECOMPUTE
+                | GraphOpFlags::SAVE_OUTPUT
+                | if is_wmma {
+                    GraphOpFlags::empty()
+                } else {
+                    GraphOpFlags::AUTO_SAVE | GraphOpFlags::COMPUTES_GID
+                },
             save,
             valid_shape,
             display: |inputs| format!("{:?} @ {:?}", inputs[0], inputs[1]),

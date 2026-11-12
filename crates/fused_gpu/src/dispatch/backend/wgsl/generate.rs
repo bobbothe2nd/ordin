@@ -1,7 +1,13 @@
 use crate::{
-    dispatch::{CompilationOptions, DebugCompilationOptions, backend::{
-        Axis, DType, Op, Param, ParamTy, SimpleDType, TensorLayout, ValueId, ValueState, codegen::{self, def_var_wgsl, newline, tab}, kernel::RawKernel,
-    }}, errors::{Error, ErrorKind},
+    dispatch::{
+        CompilationOptions, DebugCompilationOptions,
+        backend::{
+            Axis, DType, Op, Param, ParamTy, SimpleDType, TensorLayout, ValueId, ValueState,
+            codegen::{self, def_var_wgsl, newline, tab},
+            kernel::RawKernel,
+        },
+    },
+    errors::{Error, ErrorKind},
 };
 use core::fmt::Write;
 use std::{string::String, vec::Vec};
@@ -124,12 +130,19 @@ fn emit_bindings(
 }
 
 #[inline]
-fn emit_entry(kernel: &RawKernel, out: &mut String, options: &CompilationOptions, pretty_print: bool) -> Result<(), Error> {
+fn emit_entry(
+    kernel: &RawKernel,
+    out: &mut String,
+    options: &CompilationOptions,
+    pretty_print: bool,
+) -> Result<(), Error> {
     newline(pretty_print, out, 0);
     let _ = write!(
         out,
         "@compute @workgroup_size({}, ({}), ({})) ",
-        kernel.block[Axis::X], kernel.block[Axis::Y], kernel.block[Axis::Z]
+        kernel.block[Axis::X],
+        kernel.block[Axis::Y],
+        kernel.block[Axis::Z]
     );
 
     newline(pretty_print, out, 0);
@@ -156,7 +169,12 @@ fn emit_entry(kernel: &RawKernel, out: &mut String, options: &CompilationOptions
 }
 
 #[inline]
-fn emit_ops(kernel: &RawKernel, out: &mut String, options: &CompilationOptions, pretty_print: bool) -> Result<(), Error> {
+fn emit_ops(
+    kernel: &RawKernel,
+    out: &mut String,
+    options: &CompilationOptions,
+    pretty_print: bool,
+) -> Result<(), Error> {
     let mut nesting = 0;
 
     for op in &kernel.ops {
@@ -458,7 +476,11 @@ fn process_op(
         }
 
         Op::ParamLoad { param, index } => {
-            let _ = write!(out, "param{param}[{}]", render_val(*index, kernel, options)?);
+            let _ = write!(
+                out,
+                "param{param}[{}]",
+                render_val(*index, kernel, options)?
+            );
         }
 
         Op::Not { cond } => {
@@ -466,7 +488,12 @@ fn process_op(
         }
 
         Op::Cast { id, dtype } => {
-            let _ = write!(out, "{}({})", dtype.fmt_wgsl()?, render_val(*id, kernel, options)?);
+            let _ = write!(
+                out,
+                "{}({})",
+                dtype.fmt_wgsl()?,
+                render_val(*id, kernel, options)?
+            );
         }
 
         Op::BitCast { id, dtype } => {
@@ -478,11 +505,7 @@ fn process_op(
             );
         }
 
-        Op::ParamStore {
-            param,
-            index,
-            val,
-        } => {
+        Op::ParamStore { param, index, val } => {
             let _ = write!(
                 out,
                 "param{param}[{}] = {};",
@@ -491,11 +514,7 @@ fn process_op(
             );
         }
 
-        Op::ParamAccum {
-            param,
-            index,
-            val,
-        } => {
+        Op::ParamAccum { param, index, val } => {
             let _ = write!(
                 out,
                 "param{param}[{}] += {};",
@@ -504,11 +523,7 @@ fn process_op(
             );
         }
 
-        Op::ParamMul {
-            param,
-            index,
-            val,
-        } => {
+        Op::ParamMul { param, index, val } => {
             let _ = write!(
                 out,
                 "param{param}[{}] *= {};",
@@ -517,11 +532,7 @@ fn process_op(
             );
         }
 
-        Op::ParamDiv {
-            param,
-            index,
-            val,
-        } => {
+        Op::ParamDiv { param, index, val } => {
             let _ = write!(
                 out,
                 "param{param}[{}] /= {};",
@@ -530,11 +541,7 @@ fn process_op(
             );
         }
 
-        Op::ParamSub {
-            param,
-            index,
-            val,
-        } => {
+        Op::ParamSub { param, index, val } => {
             let _ = write!(
                 out,
                 "param{param}[{}] -= {};",
@@ -543,11 +550,7 @@ fn process_op(
             );
         }
 
-        Op::ParamShl {
-            param,
-            index,
-            val,
-        } => {
+        Op::ParamShl { param, index, val } => {
             let _ = write!(
                 out,
                 "param{param}[{}] <<= {};",
@@ -556,11 +559,7 @@ fn process_op(
             );
         }
 
-        Op::ParamShr {
-            param,
-            index,
-            val,
-        } => {
+        Op::ParamShr { param, index, val } => {
             let _ = write!(
                 out,
                 "param{param}[{}] >>= {};",
@@ -687,7 +686,12 @@ fn process_op(
         }
 
         Op::Index { pointer, index } => {
-            let _ = write!(out, "{}[{}]", render_val(*pointer, kernel, options)?, render_val(*index, kernel, options)?);
+            let _ = write!(
+                out,
+                "{}[{}]",
+                render_val(*pointer, kernel, options)?,
+                render_val(*index, kernel, options)?
+            );
         }
 
         Op::FillFragment { frag, val } => {
@@ -821,9 +825,7 @@ fn render_frag_index(
             layout: TensorLayout::RowMajor,
             ..
         }
-        | DType::MmaAccum { .. } => {
-            Ok(format!("(({row}) * 16u + ({col}))"))
-        }
+        | DType::MmaAccum { .. } => Ok(format!("(({row}) * 16u + ({col}))")),
 
         DType::MmaA {
             layout: TensorLayout::ColMajor,
@@ -832,9 +834,7 @@ fn render_frag_index(
         | DType::MmaB {
             layout: TensorLayout::ColMajor,
             ..
-        } => {
-            Ok(format!("(({col}) * 16u + ({row}))"))
-        }
+        } => Ok(format!("(({col}) * 16u + ({row}))")),
 
         _ => Err(Error {
             msg: "expected MMA fragment dtype",
@@ -844,6 +844,10 @@ fn render_frag_index(
     }
 }
 
-fn render_val(id: ValueId, kernel: &RawKernel, options: &CompilationOptions) -> Result<String, Error> {
+fn render_val(
+    id: ValueId,
+    kernel: &RawKernel,
+    options: &CompilationOptions,
+) -> Result<String, Error> {
     codegen::render_val(id, kernel, options, process_op)
 }
