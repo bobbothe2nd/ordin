@@ -1,4 +1,4 @@
-use irforge::{
+use ordin::{
     dispatch::{
         CompilationOptions, DebugCompilationOptions, GpuContext, Graph, MetaBuilder,
         OptCompilationOptions, RawMetaBuf, SimpleDType,
@@ -105,7 +105,7 @@ fn matmul_sub_softmax_forward_backward() {
     use simplelog::*;
 
     let logs =
-        std::fs::File::create("E:/fused_gpu/logs/matmul_sub_softmax_forward_backward.log").unwrap();
+        std::fs::File::create("logs/matmul_sub_softmax_forward_backward.log").unwrap();
     CombinedLogger::init(vec![
         TermLogger::new(
             LevelFilter::Warn,

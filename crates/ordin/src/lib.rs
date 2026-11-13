@@ -76,7 +76,7 @@ pub mod nn {
         sub, tanh,
     };
 
-    pub use irforge_nn::loss::*;
+    pub use ordin_nn::loss::*;
 }
 
 pub mod codegen {

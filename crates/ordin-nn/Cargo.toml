@@ -1,5 +1,5 @@
 [package]
-name = "irforge-nn"
+name = "ordin-nn"
 version = "0.1.0-rc.1"
 edition = "2024"
 rust-version = "1.89"

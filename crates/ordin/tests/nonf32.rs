@@ -1,4 +1,4 @@
-use irforge::{
+use ordin::{
     dispatch::{
         CompilationOptions, DebugCompilationOptions, GpuContext, Graph, MetaBuilder,
         OptCompilationOptions, RawMetaBuf, SimpleDType,

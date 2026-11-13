@@ -226,7 +226,7 @@ macro_rules! impl_op {
     ($op:ident, $($node:ident),*) => {
         pub fn $op($($node: NodeId),*) -> NodeId {
             get_graph().with_mut(|graph| {
-                NodeId(irforge_nn::op::$op(graph, $($node.0),*))
+                NodeId(ordin_nn::op::$op(graph, $($node.0),*))
             })
         }
     };

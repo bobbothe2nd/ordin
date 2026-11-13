@@ -1,5 +1,5 @@
 use gpu_telemetry::monitor::{GpuMonitor, telemetry::Telemetry};
-use irforge::{
+use ordin::{
     dispatch::{
         CompilationOptions, DebugCompilationOptions, GpuContext, Graph, MetaBuilder,
         OptCompilationOptions, RawMetaBuf, Schedule, SimpleDType,
