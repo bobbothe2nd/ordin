@@ -1,13 +1,9 @@
 use crate::{
     dispatch::{
-        CompilationOptions, DebugCompilationOptions,
-        backend::{
-            Axis, DType, Op, Param, ParamTy, SimpleDType, TensorLayout, ValueId, ValueState,
-            codegen::{self, def_var_wgsl, newline, tab},
-            kernel::RawKernel,
+        CompilationOptions, DebugCompilationOptions, backend::{
+            Axis, DType, Op, Param, ParamTy, SimpleDType, TensorLayout, ValueId, ValueState, codegen::{self, def_var_wgsl_smma, newline, tab}, kernel::RawKernel,
         },
-    },
-    errors::{Error, ErrorKind},
+    }, errors::{Error, ErrorKind},
 };
 use core::fmt::Write;
 use std::{string::String, vec::Vec};
@@ -209,7 +205,7 @@ fn process_op(
     match op {
         Op::Nop => {}
 
-        Op::DefineVar { id } => def_var_wgsl(out, nesting, *id, kernel, options, process_op)?,
+        Op::DefineVar { id } => def_var_wgsl_smma(out, nesting, *id, kernel, options, process_op)?,
 
         Op::OverwriteVar { id, val } => {
             let _ = write!(out, "v{id} = {};", render_val(*val, kernel, options)?);
@@ -491,7 +487,7 @@ fn process_op(
             let _ = write!(
                 out,
                 "{}({})",
-                dtype.fmt_wgsl()?,
+                dtype.fmt_wgsl_smma()?,
                 render_val(*id, kernel, options)?
             );
         }
@@ -500,7 +496,7 @@ fn process_op(
             let _ = write!(
                 out,
                 "bitcast<{}>({})",
-                dtype.fmt_wgsl()?,
+                dtype.fmt_wgsl_smma()?,
                 render_val(*id, kernel, options)?
             );
         }

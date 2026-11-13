@@ -121,10 +121,10 @@ impl DType {
     pub fn fmt_wgsl_smma(self) -> Result<String, Error> {
         match self {
             Self::Simple(dtype) => dtype.fmt_wgsl().map(Into::into),
-            Self::MmaA { dtype, m, n, .. }
-            | Self::MmaB { dtype, m, n, .. }
-            | Self::MmaAccum { dtype, m, n, .. } => {
-                Ok(format!("array<{},{}>", dtype.fmt_wgsl()?, m * n))
+            Self::MmaA { dtype, m: a, k: b, .. }
+            | Self::MmaB { dtype, k: a, n: b, .. }
+            | Self::MmaAccum { dtype, m: a, n: b, .. } => {
+                Ok(format!("array<{},{}>", dtype.fmt_wgsl()?, a * b))
             }
         }
     }

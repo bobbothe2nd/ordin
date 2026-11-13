@@ -33,6 +33,7 @@ pub fn forward_matmul(
     dtype: SimpleDType,
     root: NodeId,
     resolved: &mut Vec<NodeId>,
+    _backwardness: Option<u8>,
     m: ValueId,
     n: ValueId,
     k: ValueId,

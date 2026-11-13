@@ -155,6 +155,7 @@ macro_rules! impl_lower {
                 node.dtype,
                 root,
                 resolved,
+                backwardness,
                 m,
                 n,
                 k,

@@ -26,7 +26,7 @@ fn mul_add_optim() {
         debug: DebugCompilationOptions::empty(),
     };
 
-    graph.set_options(options);
+    graph.configure(options);
     graph.define(|| {
         let a = input(&[m, n], SimpleDType::F32);
         let b = input(&[m, n], SimpleDType::F32);
@@ -127,7 +127,7 @@ fn mul_add_separate_optim() {
         debug: DebugCompilationOptions::empty(),
     };
 
-    graph.set_options(options);
+    graph.configure(options);
     graph.define(|| {
         let a = input(&[m, n], SimpleDType::F32);
         let b = input(&[m, n], SimpleDType::F32);

@@ -73,7 +73,7 @@ fn main() {
         debug: DebugCompilationOptions::empty(),
     };
 
-    graph.set_options(options);
+    graph.configure(options);
     graph.define(|| {
         let a = input(&[m, k], SimpleDType::F32);
         let b = input(&[k, n], SimpleDType::F32);

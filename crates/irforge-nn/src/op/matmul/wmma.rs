@@ -1,13 +1,9 @@
 use fused_gpu::{
     dispatch::{
-        CompilationOptions,
-        backend::{
-            Axis, DType, Graph, NodeId, Op, Param, ParamId, SimpleDType, TensorLayout, ValueId,
-            ValueState,
-            kernel::{LinkedKernel, NodeInput},
+        CompilationOptions, backend::{
+            Axis, ConstOrParam, DType, Graph, GraphOp, NodeId, Op, Param, ParamId, SimpleDType, TensorLayout, ValueId, ValueState, kernel::{LinkedKernel, NodeInput},
         },
-    },
-    errors::{Error, ErrorKind},
+    }, errors::{Error, ErrorKind},
 };
 use std::vec::Vec;
 
@@ -34,6 +30,7 @@ pub fn forward_matmul(
     dtype: SimpleDType,
     _root: NodeId,
     _resolved: &mut Vec<NodeId>,
+    backwardness: Option<u8>,
     _m: ValueId,
     n: ValueId,
     k: ValueId,
@@ -42,9 +39,9 @@ pub fn forward_matmul(
     node_id: NodeId,
     a_node: &NodeInput,
     b_node: &NodeInput,
-    _graph: &Graph,
+    graph: &Graph,
     _out: ValueId,
-    _node_params: &[Option<ParamId>],
+    node_params: &[Option<ParamId>],
     saved_params: &[Option<ParamId>],
     kernel: &mut LinkedKernel,
     base: ValueId,
@@ -102,29 +99,57 @@ pub fn forward_matmul(
         }),
     );
 
-    println!("{node_id} := MatMul({a_node:?}, {b_node:?})\n {saved_params:?}");
-
+    let a_err = Error {
+        msg: "expected a_node mapping to param",
+        kind: ErrorKind::UnresolvedInput,
+        ctx: (),
+    };
     let a = match a_node {
-        NodeInput::Param { param, .. } => *param,
-        NodeInput::Node(node_id) => saved_params[*node_id].ok_or(Error {
-            msg: "expected a_node mapping to param",
-            kind: ErrorKind::UnresolvedInput,
-            ctx: (),
-        })?,
+        NodeInput::Param { param, .. } => ConstOrParam::Param(*param),
+        NodeInput::Node(node_id) => match graph.nodes[*node_id].op {
+            GraphOp::Custom { .. } => ConstOrParam::Param(node_params[*node_id].or(saved_params[*node_id]).ok_or(a_err)?),
+            GraphOp::Input if let Some(param) = node_params[*node_id] => ConstOrParam::Param(param),
+            GraphOp::ConstI32(val) => ConstOrParam::ConstI32(val),
+            GraphOp::ConstU32(val) => ConstOrParam::ConstU32(val),
+            GraphOp::ConstF32(val) => ConstOrParam::ConstF32(val),
+            GraphOp::ConstF16(val) => ConstOrParam::ConstF16(val),
+            GraphOp::ConstBf16(val) => ConstOrParam::ConstBf16(val),
+            _ => return Err(a_err),
+        },
+    };
+    kernel.try_register_param(a);
+
+    let b_err = Error {
+        msg: "expected b_node mapping to param",
+        kind: ErrorKind::UnresolvedInput,
+        ctx: (),
     };
     let b = match b_node {
-        NodeInput::Param { param, .. } => *param,
-        NodeInput::Node(node_id) => saved_params[*node_id].ok_or(Error {
-            msg: "expected b_node mapping to param",
-            kind: ErrorKind::UnresolvedInput,
-            ctx: (),
-        })?,
+        NodeInput::Param { param, .. } => ConstOrParam::Param(*param),
+        NodeInput::Node(node_id) => match graph.nodes[*node_id].op {
+            GraphOp::Custom { .. } => ConstOrParam::Param(node_params[*node_id].or(saved_params[*node_id]).ok_or(b_err)?),
+            GraphOp::Input if let Some(param) = node_params[*node_id] => ConstOrParam::Param(param),
+            GraphOp::ConstI32(val) => ConstOrParam::ConstI32(val),
+            GraphOp::ConstU32(val) => ConstOrParam::ConstU32(val),
+            GraphOp::ConstF32(val) => ConstOrParam::ConstF32(val),
+            GraphOp::ConstF16(val) => ConstOrParam::ConstF16(val),
+            GraphOp::ConstBf16(val) => ConstOrParam::ConstBf16(val),
+            _ => return Err(b_err),
+        },
     };
-    let c = saved_params[node_id].ok_or(Error {
+    kernel.try_register_param(b);
+
+    let c = if backwardness.is_none() {
+        saved_params[node_id]
+    } else {
+        node_params[node_id]
+    }
+    .ok_or(Error {
         msg: "expected node_id mapping to param",
         kind: ErrorKind::UnresolvedOutput,
         ctx: (),
     })?;
+    kernel.register_param(c);
 
     let deepest = Vec::new();
 
@@ -183,73 +208,123 @@ pub fn forward_matmul(
     );
 
     kernel.push_for_loop(tk, k, tile_size, |kernel| {
-        let a_col = if swap_a {
-            let a_row = kernel.raw.def_var(
-                DType::Simple(SimpleDType::U32),
-                ValueState::Inline,
-                Some(Op::Mul { a: k, b: tk }),
-            );
-            kernel.raw.def_var(
-                DType::Simple(SimpleDType::U32),
-                ValueState::Inline,
-                Some(Op::Add {
-                    a: a_row,
-                    b: tile_m,
-                }),
-            )
-        } else {
-            let a_row = kernel.raw.def_var(
-                DType::Simple(SimpleDType::U32),
-                ValueState::Inline,
-                Some(Op::Mul { a: k, b: tile_m }),
-            );
-            kernel.raw.def_var(
-                DType::Simple(SimpleDType::U32),
-                ValueState::Inline,
-                Some(Op::Add { a: a_row, b: tk }),
-            )
-        };
-        let a_idx = kernel.raw.def_var(
-            DType::Simple(SimpleDType::U32),
-            ValueState::Inline,
-            Some(Op::Add { a: a_col, b: base }),
-        );
+        match a {
+            ConstOrParam::Param(param) => {
+                let a_col = if swap_a {
+                    let a_row = kernel.raw.def_var(
+                        DType::Simple(SimpleDType::U32),
+                        ValueState::Inline,
+                        Some(Op::Mul { a: k, b: tk }),
+                    );
+                    kernel.raw.def_var(
+                        DType::Simple(SimpleDType::U32),
+                        ValueState::Inline,
+                        Some(Op::Add {
+                            a: a_row,
+                            b: tile_m,
+                        }),
+                    )
+                } else {
+                    let a_row = kernel.raw.def_var(
+                        DType::Simple(SimpleDType::U32),
+                        ValueState::Inline,
+                        Some(Op::Mul { a: k, b: tile_m }),
+                    );
+                    kernel.raw.def_var(
+                        DType::Simple(SimpleDType::U32),
+                        ValueState::Inline,
+                        Some(Op::Add { a: a_row, b: tk }),
+                    )
+                };
+                let a_idx = kernel.raw.def_var(
+                    DType::Simple(SimpleDType::U32),
+                    ValueState::Inline,
+                    Some(Op::Add { a: a_col, b: base }),
+                );
 
-        kernel.raw.load_matrix_sync(a, frag_a, a_idx, k);
+                kernel.raw.load_matrix_sync(param, frag_a, a_idx, k);
+            }
+            ConstOrParam::ConstBf16(val) => {
+                let val = kernel.raw.def_var(DType::Simple(SimpleDType::BF16), ValueState::Inline, Some(Op::ConstBf16 { val }));
+                kernel.raw.fill_frag(frag_a, val);
+            }
+            ConstOrParam::ConstF16(val) => {
+                let val = kernel.raw.def_var(DType::Simple(SimpleDType::F16), ValueState::Inline, Some(Op::ConstF16 { val }));
+                kernel.raw.fill_frag(frag_a, val);
+            }
+            ConstOrParam::ConstF32(val) => {
+                let val = kernel.raw.def_var(DType::Simple(SimpleDType::F32), ValueState::Inline, Some(Op::ConstF32 { val }));
+                kernel.raw.fill_frag(frag_a, val);
+            }
+            ConstOrParam::ConstI32(val) => {
+                let val = kernel.raw.def_var(DType::Simple(SimpleDType::I32), ValueState::Inline, Some(Op::ConstI32 { val }));
+                kernel.raw.fill_frag(frag_a, val);
+            }
+            ConstOrParam::ConstU32(val) => {
+                let val = kernel.raw.def_var(DType::Simple(SimpleDType::U32), ValueState::Inline, Some(Op::ConstU32 { val }));
+                kernel.raw.fill_frag(frag_a, val);
+            }
+            _ => unreachable!("expected a_node param or const input"),
+        }
 
-        let b_col = if swap_b {
-            let b_row = kernel.raw.def_var(
-                DType::Simple(SimpleDType::U32),
-                ValueState::Inline,
-                Some(Op::Mul { a: n, b: tile_n }),
-            );
-            kernel.raw.def_var(
-                DType::Simple(SimpleDType::U32),
-                ValueState::Inline,
-                Some(Op::Add { a: b_row, b: tk }),
-            )
-        } else {
-            let b_row = kernel.raw.def_var(
-                DType::Simple(SimpleDType::U32),
-                ValueState::Inline,
-                Some(Op::Mul { a: n, b: tk }),
-            );
-            kernel.raw.def_var(
-                DType::Simple(SimpleDType::U32),
-                ValueState::Inline,
-                Some(Op::Add {
-                    a: b_row,
-                    b: tile_n,
-                }),
-            )
-        };
-        let b_idx = kernel.raw.def_var(
-            DType::Simple(SimpleDType::U32),
-            ValueState::Inline,
-            Some(Op::Add { a: b_col, b: base }),
-        );
+        match b {
+            ConstOrParam::Param(param) => {
+                let b_col = if swap_b {
+                    let b_row = kernel.raw.def_var(
+                        DType::Simple(SimpleDType::U32),
+                        ValueState::Inline,
+                        Some(Op::Mul { a: n, b: tile_n }),
+                    );
+                    kernel.raw.def_var(
+                        DType::Simple(SimpleDType::U32),
+                        ValueState::Inline,
+                        Some(Op::Add { a: b_row, b: tk }),
+                    )
+                } else {
+                    let b_row = kernel.raw.def_var(
+                        DType::Simple(SimpleDType::U32),
+                        ValueState::Inline,
+                        Some(Op::Mul { a: n, b: tk }),
+                    );
+                    kernel.raw.def_var(
+                        DType::Simple(SimpleDType::U32),
+                        ValueState::Inline,
+                        Some(Op::Add {
+                            a: b_row,
+                            b: tile_n,
+                        }),
+                    )
+                };
+                let b_idx = kernel.raw.def_var(
+                    DType::Simple(SimpleDType::U32),
+                    ValueState::Inline,
+                    Some(Op::Add { a: b_col, b: base }),
+                );
 
-        kernel.raw.load_matrix_sync(b, frag_b, b_idx, n);
+                kernel.raw.load_matrix_sync(param, frag_b, b_idx, n);
+            }
+            ConstOrParam::ConstBf16(val) => {
+                let val = kernel.raw.def_var(DType::Simple(SimpleDType::BF16), ValueState::Inline, Some(Op::ConstBf16 { val }));
+                kernel.raw.fill_frag(frag_b, val);
+            }
+            ConstOrParam::ConstF16(val) => {
+                let val = kernel.raw.def_var(DType::Simple(SimpleDType::F16), ValueState::Inline, Some(Op::ConstF16 { val }));
+                kernel.raw.fill_frag(frag_b, val);
+            }
+            ConstOrParam::ConstF32(val) => {
+                let val = kernel.raw.def_var(DType::Simple(SimpleDType::F32), ValueState::Inline, Some(Op::ConstF32 { val }));
+                kernel.raw.fill_frag(frag_b, val);
+            }
+            ConstOrParam::ConstI32(val) => {
+                let val = kernel.raw.def_var(DType::Simple(SimpleDType::I32), ValueState::Inline, Some(Op::ConstI32 { val }));
+                kernel.raw.fill_frag(frag_b, val);
+            }
+            ConstOrParam::ConstU32(val) => {
+                let val = kernel.raw.def_var(DType::Simple(SimpleDType::U32), ValueState::Inline, Some(Op::ConstU32 { val }));
+                kernel.raw.fill_frag(frag_b, val);
+            }
+            _ => unreachable!("expected a_node param or const input"),
+        }
 
         kernel.raw.mma_sync(frag_c, frag_a, frag_b, frag_c);
 

@@ -27,7 +27,7 @@ fn mul_add_f16() {
         debug: DebugCompilationOptions::empty(),
     };
 
-    graph.set_options(options);
+    graph.configure(options);
     graph.define(|| {
         let a = input(&[m, n], SimpleDType::F16);
         let b = input(&[m, n], SimpleDType::F16);
@@ -124,7 +124,7 @@ fn matmul_gelu_f16() {
         debug: DebugCompilationOptions::empty(),
     };
 
-    graph.set_options(options);
+    graph.configure(options);
 
     graph.define(|| {
         let a = input(&[m, k], SimpleDType::F16);

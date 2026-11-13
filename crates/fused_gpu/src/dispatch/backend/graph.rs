@@ -1,0 +1,1188 @@
+use core::cmp::Ordering;
+
+use bitflags::bitflags;
+
+use crate::{dispatch::{CompilationOptions, backend::{Op, kernel::{Kernel, KernelGroup, KernelsChained, LinkedKernel, NodeInput, SaveIndicator}}}, errors::{Error, ErrorKind, GraphErrorContext}, tensor::{f16, bf16}};
+
+/// Identifier of a node in a graph.
+pub type NodeId = usize;
+
+/// Identifier of a parameter in kernel IR.
+pub type ParamId = usize;
+
+/// Identifier of a metadata field in kernel IR.
+pub type MetaId = usize;
+
+/// Identifier of a shared buffer in kernel IR.
+pub type SharedId = usize;
+
+/// Identifier of a val in kernel IR.
+pub type ValueId = usize;
+
+/// Data type used in kernel IR.
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DType {
+    Simple(SimpleDType),
+    MmaA {
+        dtype: SimpleDType,
+        m: u32,
+        n: u32,
+        k: u32,
+        layout: TensorLayout,
+    },
+    MmaB {
+        dtype: SimpleDType,
+        m: u32,
+        n: u32,
+        k: u32,
+        layout: TensorLayout,
+    },
+    MmaAccum {
+        dtype: SimpleDType,
+        m: u32,
+        n: u32,
+        k: u32,
+    },
+}
+
+impl DType {
+    #[inline]
+    #[must_use]
+    pub const fn bits(self) -> usize {
+        match self {
+            Self::Simple(dtype) => dtype.bits(),
+            Self::MmaA {
+                dtype,
+                m,
+                n,
+                k,
+                layout: _,
+            }
+            | Self::MmaB {
+                dtype,
+                m,
+                n,
+                k,
+                layout: _,
+            }
+            | Self::MmaAccum { dtype, m, n, k } => dtype.bits() * (m * n * k) as usize,
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn size(self) -> usize {
+        match self {
+            Self::Simple(dtype) => dtype.size(),
+            Self::MmaA {
+                dtype,
+                m,
+                n,
+                k,
+                layout: _,
+            }
+            | Self::MmaB {
+                dtype,
+                m,
+                n,
+                k,
+                layout: _,
+            }
+            | Self::MmaAccum { dtype, m, n, k } => dtype.size() * (m * n * k) as usize,
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn is_float(self) -> bool {
+        match self {
+            Self::Simple(dtype) => dtype.is_float(),
+            _ => false,
+        }
+    }
+
+    #[inline]
+    pub fn constant_float(self, val: f32) -> Result<Op, Error> {
+        match self {
+            Self::Simple(dtype) => dtype.constant_float(val),
+            _ => Err(Error {
+                msg: "cannot represent MMA fragment dtype as float constant",
+                kind: ErrorKind::InternalError,
+                ctx: (),
+            }),
+        }
+    }
+
+    #[inline]
+    pub const fn constant_min(self) -> Result<Op, Error> {
+        match self {
+            Self::Simple(dtype) => dtype.constant_min(),
+            _ => Err(Error {
+                msg: "cannot represent MMA fragment dtype as min constant",
+                kind: ErrorKind::InternalError,
+                ctx: (),
+            }),
+        }
+    }
+
+    #[inline]
+    pub const fn constant_max(self) -> Result<Op, Error> {
+        match self {
+            Self::Simple(dtype) => dtype.constant_max(),
+            _ => Err(Error {
+                msg: "cannot represent MMA fragment dtype as max constant",
+                kind: ErrorKind::InternalError,
+                ctx: (),
+            }),
+        }
+    }
+}
+
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SimpleDType {
+    F64,
+    F32,
+    F16,
+    BF16,
+    I32,
+    U32,
+    Bool,
+}
+
+impl SimpleDType {
+    #[inline]
+    #[must_use]
+    pub const fn bits(self) -> usize {
+        match self {
+            Self::Bool => 8,
+            Self::BF16 | Self::F16 => 16,
+            Self::F32 | Self::I32 | Self::U32 => 32,
+            Self::F64 => 64,
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn size(self) -> usize {
+        match self {
+            Self::Bool => 1,
+            Self::BF16 | Self::F16 => 2,
+            Self::F32 | Self::I32 | Self::U32 => 4,
+            Self::F64 => 8,
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn is_float(self) -> bool {
+        matches!(self, Self::BF16 | Self::F16 | Self::F32 | Self::F64)
+    }
+
+    #[inline]
+    pub fn constant_float(self, val: f32) -> Result<Op, Error> {
+        match self {
+            Self::BF16 => Ok(Op::ConstBf16 {
+                val: bf16::from_f32(val),
+            }),
+            Self::F16 => Ok(Op::ConstF16 {
+                val: f16::from_f32(val),
+            }),
+            Self::F32 => Ok(Op::ConstF32 { val }),
+            _ => Err(Error {
+                msg: "cannot represent non-float dtype as float constant",
+                kind: ErrorKind::InternalError,
+                ctx: (),
+            }),
+        }
+    }
+
+    #[inline]
+    pub const fn constant_min(self) -> Result<Op, Error> {
+        match self {
+            Self::BF16 => Ok(Op::ConstBf16 { val: bf16::MIN }),
+            Self::F16 => Ok(Op::ConstF16 { val: f16::MIN }),
+            Self::F32 => Ok(Op::ConstF32 { val: f32::MIN }),
+            Self::F64 => Ok(Op::ConstF64 { val: f64::MIN }),
+            Self::I32 => Ok(Op::ConstI32 { val: i32::MIN }),
+            Self::U32 => Ok(Op::ConstU32 { val: u32::MIN }),
+            Self::Bool => Err(Error {
+                msg: "cannot represent bool dtype as MIN val",
+                kind: ErrorKind::InternalError,
+                ctx: (),
+            }),
+        }
+    }
+
+    #[inline]
+    pub const fn constant_max(self) -> Result<Op, Error> {
+        match self {
+            Self::BF16 => Ok(Op::ConstBf16 { val: bf16::MAX }),
+            Self::F16 => Ok(Op::ConstF16 { val: f16::MAX }),
+            Self::F32 => Ok(Op::ConstF32 { val: f32::MAX }),
+            Self::F64 => Ok(Op::ConstF64 { val: f64::MAX }),
+            Self::I32 => Ok(Op::ConstI32 { val: i32::MAX }),
+            Self::U32 => Ok(Op::ConstU32 { val: u32::MAX }),
+            Self::Bool => Err(Error {
+                msg: "cannot represent bool dtype as MAX val",
+                kind: ErrorKind::InternalError,
+                ctx: (),
+            }),
+        }
+    }
+}
+
+/// Parameter type used in kernel IR.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Param {
+    pub dtype: SimpleDType,
+    pub ty: ParamTy,
+    pub pid: ParamId,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ParamTy {
+    Uniform,
+    ReadWrite,
+    ReadOnly,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TensorLayout {
+    RowMajor,
+    ColMajor,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SharedAlloc {
+    pub dtype: SimpleDType,
+    pub size: u32,
+}
+
+/// Value type used in kernel IR.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Value {
+    pub state: ValueState,
+    pub dtype: DType,
+    pub init: Option<Op>,
+}
+
+/// Value state type that defines a val.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ValueState {
+    Mut,
+    Immut,
+    Masked,
+    Inline,
+    Const,
+}
+
+/// Axis type used in kernel IR.
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Axis {
+    /// x-axis (0)
+    X = 0,
+
+    /// y-axis (1)
+    Y = 1,
+
+    /// z-axis (2)
+    Z = 2,
+}
+
+impl TryFrom<u8> for Axis {
+    type Error = Error;
+
+    #[inline]
+    fn try_from(val: u8) -> Result<Self, Error> {
+        match val {
+            0 => Ok(Self::X),
+            1 => Ok(Self::Y),
+            2 => Ok(Self::Z),
+            _ => Err(Error {
+                msg: "could not coerce invalid integer to axis",
+                kind: ErrorKind::InvalidArgument,
+                ctx: (),
+            }),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Node {
+    pub name: Box<str>,
+    pub op: GraphOp,
+    pub inputs: Box<[NodeId]>,
+    pub outputs: Vec<NodeId>,
+    pub shape: Box<[MetaId]>,
+    pub dtype: SimpleDType,
+}
+
+#[derive(Debug, Clone, Copy, Hash)]
+pub struct LossType {
+    /// Signature:
+    /// ```ignore
+    /// fn(
+    ///     kernel: &mut Kernel,
+    ///     dtype: DType,
+    ///     pred: ValueId,
+    ///     target: ValueId,
+    ///     pred_param: ParamId,
+    ///     target_param: ParamId,
+    ///     row: ValueId,
+    ///     col: ValueId,
+    /// ) -> (
+    ///     loss_val: ValueId,
+    ///     grad_val: ValueId
+    /// )
+    /// ```
+    pub lower: fn(
+        &mut Kernel,
+        DType,
+        ValueId,
+        ValueId,
+        ParamId,
+        ParamId,
+        ValueId,
+        ValueId,
+    ) -> Result<(ValueId, ValueId), Error>,
+}
+
+#[derive(Debug, Clone, Copy, Hash)]
+pub struct OptimType {
+    /// Signature:
+    /// ```ignore
+    /// fn(
+    ///     kernel: &mut Kernel,
+    ///     dtype: SimpleDType,
+    ///     lr: ValueId,
+    ///     weights: ParamId,
+    ///     grads: ParamId,
+    ///     gid: ValueId,
+    ///     row: ValueId,
+    ///     col: ValueId,
+    /// )
+    /// ```
+    pub lower: fn(
+        &mut Kernel,
+        SimpleDType,
+        ValueId,
+        ParamId,
+        ParamId,
+        ValueId,
+        ValueId,
+        ValueId,
+    ) -> Result<(), Error>,
+}
+
+#[derive(Debug)]
+pub struct OptimState {
+    pub shapes: Box<[StateDim]>,
+}
+
+#[derive(Debug, Clone, Copy, Hash)]
+pub enum StateDim {
+    Const(u32),
+    GradRelative(u32),
+}
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Metadata {
+    pub(crate) fields: MetaId,
+}
+
+impl Default for Metadata {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Metadata {
+    /// Defines an empty metadata instance.
+    #[must_use]
+    #[inline]
+    pub const fn new() -> Self {
+        Self { fields: 1 }
+    }
+
+    /// Defines a new metadata field, returning the identifier.
+    ///
+    /// The identifier will always be 1 more than than the previous field, starting from 0.
+    pub const fn new_field(&mut self) -> MetaId {
+        let field = self.fields;
+        self.fields += 1;
+        field
+    }
+
+    /// Returns an iterator over each index.
+    ///
+    /// This is numerically `0..[len]`.
+    #[must_use]
+    #[inline]
+    pub const fn iter_fields(&self) -> core::ops::Range<MetaId> {
+        0..self.fields
+    }
+
+    /// Checks if metadata is valid.
+    ///
+    /// Valid metadata is defined as:
+    ///
+    /// - instantiation must be the same length as compile time definition
+    /// - all shape fields must be multiples of 16
+    ///
+    /// If valid, return `true`. If any of the above criterion fail, return `false`.
+    #[must_use]
+    #[inline]
+    pub fn validate_meta(&self, meta: &[u32]) -> bool {
+        meta.len() == self.fields && meta.iter().skip(1).all(|x| x.is_multiple_of(16))
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum DispatchOptions {
+    /// Require no special dispatch (used for most)
+    Any,
+
+    /// Require rows to remain consistent for iteration by column
+    ReqRow,
+
+    /// Require columns to remain consistent for iteration by row (used for softmax)
+    ReqCol,
+}
+
+impl PartialOrd for DispatchOptions {
+    fn ge(&self, other: &Self) -> bool {
+        self == other
+    }
+
+    fn gt(&self, other: &Self) -> bool {
+        *self != Self::Any && *other == Self::Any
+    }
+
+    fn le(&self, other: &Self) -> bool {
+        self == other
+    }
+
+    fn lt(&self, other: &Self) -> bool {
+        *self == Self::Any && *other != Self::Any
+    }
+
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self == other {
+            return Some(Ordering::Equal);
+        }
+
+        match (self, other) {
+            (Self::Any, _) => Some(Ordering::Less),
+            (_, Self::Any) => Some(Ordering::Greater),
+            _ => None,
+        }
+    }
+}
+
+bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct GraphOpFlags: u8 {
+        /// The operation maintains a stable iteration space, guaranteeing all inputs have the same shape as the output.
+        const STABLE_ITER = 1 << 0;
+
+        /// Tensor dimensions matter for this operation (same as level 2 | 3 BLAS).
+        const NEEDS_DIMS = 1 << 1;
+
+        /// Each thread computes a single output in the index of its global thread ID.
+        const COMPUTES_GID = 1 << 2;
+
+        /// The operation is expensive and should avoid recomputation.
+        const NO_RECOMPUTE = 1 << 3;
+
+        /// The operations implements no manual saving and requires the compiler to generate it automatically.
+        const AUTO_SAVE = 1 << 4;
+
+        /// The operation saves the same value for both forward and backward.
+        const SAVE_OUTPUT = 1 << 5;
+    }
+}
+
+/// A linear operation in an execution graph.
+///
+/// This treats lowering functions as unique identifiers, so **don't reuse functions**.
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy)]
+pub enum GraphOp {
+    Input,
+
+    ConstU32(u32),
+    ConstI32(i32),
+    ConstF32(f32),
+    ConstF16(f16),
+    ConstBf16(bf16),
+
+    Custom {
+        lower: fn(
+            fn(
+                NodeId,
+                &NodeInput,
+                ValueId,
+                &mut Vec<NodeId>,
+                &Graph,
+                &[Option<ParamId>],
+                &[Option<ParamId>],
+                &mut LinkedKernel,
+                ValueId,
+                ValueId,
+                ValueId,
+                ValueId,
+                u32,
+                ValueId,
+                &[Param],
+                &mut bool,
+                &CompilationOptions,
+            ) -> Result<Vec<NodeId>, Error>,
+            NodeId,
+            &mut Vec<NodeId>,
+            Option<u8>,
+            NodeId,
+            &Graph,
+            ValueId,
+            &[Option<ParamId>],
+            &[Option<ParamId>],
+            &mut LinkedKernel,
+            ValueId,
+            ValueId,
+            ValueId,
+            ValueId,
+            u32,
+            ValueId,
+            &[Param],
+            &mut bool,
+            &CompilationOptions,
+        ) -> Result<Vec<NodeId>, Error>,
+        display: fn(&[Box<[MetaId]>]) -> String,
+        save: fn(NodeId, &Node, &Graph, &mut [SaveIndicator]),
+        valid_shape: fn(NodeId, &Node, &Graph, &mut Vec<Error<GraphErrorContext>>),
+        arity: u8,
+        flags: GraphOpFlags,
+        valid_dispatch: DispatchOptions,
+    },
+}
+
+impl PartialEq for GraphOp {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Input, Self::Input) => true,
+            (Self::ConstF32(a), Self::ConstF32(b)) => a == b,
+            (Self::Custom { lower: a_lower, .. }, Self::Custom { lower: b_lower, .. }) => {
+                (*a_lower as usize) == (*b_lower as usize)
+            }
+            _ => false,
+        }
+    }
+}
+
+impl GraphOp {
+    #[inline]
+    #[must_use]
+    pub const fn is_elementwise(&self) -> bool {
+        if let Self::Custom { flags, .. } = self {
+            !flags.contains(GraphOpFlags::NEEDS_DIMS)
+        } else {
+            false
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn is_transform(&self) -> bool {
+        if let Self::Custom { flags, .. } = self {
+            !flags.contains(GraphOpFlags::STABLE_ITER)
+        } else {
+            false
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn is_leaf(&self) -> bool {
+        self.is_input() || self.is_const()
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn is_const(&self) -> bool {
+        matches!(
+            self,
+            Self::ConstF32(_)
+                | Self::ConstF16(_)
+                | Self::ConstBf16(_)
+                | Self::ConstU32(_)
+                | Self::ConstI32(_)
+        )
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn is_input(&self) -> bool {
+        matches!(self, Self::Input)
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn is_auto_save(&self) -> bool {
+        if let Self::Custom { flags, .. } = self {
+            flags.contains(GraphOpFlags::AUTO_SAVE)
+        } else {
+            false
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn saves_output(&self) -> bool {
+        if let Self::Custom { flags, .. } = self {
+            flags.contains(GraphOpFlags::SAVE_OUTPUT)
+        } else {
+            false
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn is_compute_gid(&self) -> bool {
+        if let Self::Custom { flags, .. } = self {
+            flags.contains(GraphOpFlags::COMPUTES_GID)
+        } else {
+            false
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn is_prefer_separate(&self) -> bool {
+        if let Self::Custom { flags, .. } = self {
+            flags.contains(GraphOpFlags::NO_RECOMPUTE)
+        } else {
+            false
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn is_need_dims(&self) -> bool {
+        if let Self::Custom { flags, .. } = self {
+            flags.contains(GraphOpFlags::NEEDS_DIMS)
+        } else {
+            false
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn valid_dispatch(&self) -> DispatchOptions {
+        if let Self::Custom { valid_dispatch, .. } = self {
+            *valid_dispatch
+        } else {
+            DispatchOptions::Any
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn arity(&self) -> u8 {
+        if let Self::Custom { arity, .. } = self {
+            *arity
+        } else {
+            0
+        }
+    }
+
+    #[must_use]
+    #[inline]
+    pub fn debug(&self, all_hand_sides: &[Box<[MetaId]>]) -> String {
+        match self {
+            Self::Custom { display, .. } => display(all_hand_sides),
+            _ => String::new(),
+        }
+    }
+}
+
+#[inline]
+fn check_acrylicity(graph: &Graph, errors: &mut Vec<Error<GraphErrorContext>>) {
+    #[inline]
+    fn dfs(
+        node: NodeId,
+        graph: &Graph,
+        visited: &mut [bool],
+        stack: &mut [bool],
+        errors: &mut Vec<Error<GraphErrorContext>>,
+        path: &mut Vec<NodeId>,
+    ) {
+        if stack[node] {
+            errors.push(Error {
+                msg: "graph must be acrylic",
+                kind: ErrorKind::ComputeGraphError,
+                ctx: GraphErrorContext::CycleDetected {
+                    node,
+                    path: path.clone(),
+                },
+            });
+            return;
+        }
+
+        if visited[node] {
+            return;
+        }
+
+        visited[node] = true;
+        stack[node] = true;
+        path.push(node);
+
+        let n = &graph.nodes[node];
+
+        for input in &n.inputs {
+            dfs(*input, graph, visited, stack, errors, path);
+        }
+
+        stack[node] = false;
+        path.clear();
+    }
+
+    let mut visited = vec![false; graph.nodes.len()];
+    let mut stack = vec![false; graph.nodes.len()];
+
+    let mut path = Vec::new();
+    for node_id in 0..graph.nodes.len() {
+        dfs(node_id, graph, &mut visited, &mut stack, errors, &mut path);
+    }
+}
+
+#[inline]
+fn check_inputs_exist(graph: &Graph, errors: &mut Vec<Error<GraphErrorContext>>) {
+    let node_count = graph.nodes.len();
+
+    for (node_id, node) in graph.nodes.iter().enumerate() {
+        for input in &node.inputs {
+            if *input >= node_count {
+                errors.push(Error {
+                    msg: "node referenced non-existent input(s)",
+                    kind: ErrorKind::ComputeGraphError,
+                    ctx: GraphErrorContext::MissingInput {
+                        node: node_id,
+                        input: *input,
+                    },
+                });
+            }
+        }
+    }
+}
+
+#[inline]
+fn check_metadata(graph: &Graph, meta: Metadata, errors: &mut Vec<Error<GraphErrorContext>>) {
+    for (node_id, node) in graph.nodes.iter().enumerate() {
+        for &dim in &node.shape {
+            if dim >= meta.fields {
+                errors.push(Error {
+                    msg: "node has no metadata entry",
+                    kind: ErrorKind::ComputeGraphError,
+                    ctx: GraphErrorContext::MissingMetadata {
+                        node: node_id,
+                        meta: dim,
+                    },
+                });
+            }
+        }
+    }
+}
+
+fn check_shapes(graph: &Graph, errors: &mut Vec<Error<GraphErrorContext>>) {
+    for (node_id, node) in graph.nodes.iter().enumerate() {
+        if node.shape.len() < 2 && !node.op.is_leaf() {
+            errors.push(Error {
+                msg: "no compute node can have less than two dimensions",
+                kind: ErrorKind::ComputeGraphError,
+                ctx: GraphErrorContext::LowRank {
+                    node: node_id,
+                    rank: node.shape.len(),
+                    required: 2,
+                },
+            });
+        }
+
+        match node.op {
+            GraphOp::Custom { valid_shape, .. } => {
+                valid_shape(node_id, node, graph, errors);
+            }
+
+            _ => {
+                if !node.inputs.is_empty() {
+                    errors.push(Error {
+                        msg: "leaf node accepting inputs",
+                        kind: ErrorKind::ComputeGraphError,
+                        ctx: GraphErrorContext::InvalidInputs {
+                            node: node_id,
+                            arity: 0,
+                            args: node.inputs.len(),
+                        },
+                    });
+                }
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Graph {
+    pub nodes: Vec<Node>,
+    pub options: Option<CompilationOptions>,
+    pub(crate) loss: LossType,
+    pub(crate) optim: OptimType,
+}
+
+impl Graph {
+    #[must_use]
+    #[inline]
+    pub const fn new(loss: LossType, optim: OptimType) -> Self {
+        Self {
+            nodes: Vec::new(),
+            options: None,
+            loss,
+            optim,
+        }
+    }
+
+    #[must_use]
+    #[inline]
+    pub fn get_adjacent(&self, node: NodeId, user: NodeId) -> Vec<NodeId> {
+        let user_inputs = &self.nodes[user].inputs;
+
+        let mut adjacent = Vec::new();
+
+        for input in user_inputs {
+            if *input != node {
+                continue;
+            }
+
+            let outputs = &self.nodes[*input].outputs;
+
+            adjacent.reserve(outputs.len());
+
+            for output in outputs {
+                adjacent.push(*output);
+            }
+        }
+
+        adjacent
+    }
+
+    #[must_use]
+    #[inline]
+    pub fn is_lhs_edge(&self, node: NodeId, user: NodeId) -> bool {
+        let user_inputs = &self.nodes[user].inputs;
+
+        !user_inputs.is_empty() && user_inputs[0] == node
+    }
+
+    #[must_use]
+    #[inline]
+    pub fn is_rhs_edge(&self, node: NodeId, user: NodeId) -> bool {
+        let user_inputs = &self.nodes[user].inputs;
+
+        user_inputs.len() > 1 && user_inputs[1] == node
+    }
+
+    #[must_use]
+    #[inline]
+    pub fn is_edge(&self, node: NodeId, user: NodeId, edge: usize) -> bool {
+        let user_inputs = &self.nodes[user].inputs;
+
+        user_inputs.len() > edge && user_inputs[edge] == node
+    }
+
+    #[must_use]
+    #[inline]
+    pub fn get_edge(&self, node: NodeId, user: NodeId) -> Option<usize> {
+        let user_inputs = &self.nodes[user].inputs;
+
+        user_inputs.iter().position(|input| *input == node)
+    }
+
+    /// Topologically sorts the nodes in the graph by inputs.
+    ///
+    /// After sorting, it's important to rebuild the outputs ([`Self::rebuild_outputs`]) before
+    /// lowering. Its probably a good idea to sort it before lowering and validate it before
+    /// sorting too.
+    ///
+    /// # Errors
+    ///
+    /// Fails if the graph is structurally broken (e.g. containing loops).
+    pub fn topo_sort(&mut self) -> Result<(), Error<GraphErrorContext>> {
+        let n = self.nodes.len();
+
+        let mut in_degree = vec![0usize; n];
+        let mut adj = vec![Vec::<usize>::new(); n];
+
+        for (node_id, node) in self.nodes.iter().enumerate() {
+            for &inp in &node.inputs {
+                if inp >= n {
+                    return Err(Error {
+                        msg: "invalid node reference in graph",
+                        kind: ErrorKind::ComputeGraphError,
+                        ctx: GraphErrorContext::MissingInput {
+                            node: node_id,
+                            input: inp,
+                        },
+                    });
+                }
+
+                adj[inp].push(node_id);
+                in_degree[node_id] += 1;
+            }
+        }
+
+        let mut zeros: Vec<_> = (0..n).filter(|&i| in_degree[i] == 0).collect();
+
+        zeros.sort_unstable();
+
+        let mut order = Vec::with_capacity(n);
+
+        let mut idx = 0;
+        while idx < zeros.len() {
+            let node = zeros[idx];
+            idx += 1;
+
+            order.push(node);
+
+            let mut nexts = adj[node].clone();
+            nexts.sort_unstable();
+
+            for nxt in nexts {
+                in_degree[nxt] -= 1;
+                if in_degree[nxt] == 0 {
+                    zeros.push(nxt);
+                }
+            }
+        }
+
+        if order.len() != n {
+            return Err(Error {
+                msg: "cycle detected in graph",
+                kind: ErrorKind::ComputeGraphError,
+                ctx: GraphErrorContext::CycleDetected {
+                    node: 0,
+                    path: order,
+                },
+            });
+        }
+
+        let mut new_index = vec![0usize; n];
+        for (i, &old) in order.iter().enumerate() {
+            new_index[old] = i;
+        }
+
+        let mut new_nodes = Vec::with_capacity(n);
+
+        for &old_id in &order {
+            let mut node = self.nodes[old_id].clone();
+
+            for inp in &mut node.inputs {
+                *inp = new_index[*inp];
+            }
+
+            node.outputs.clear();
+
+            new_nodes.push(node);
+        }
+
+        self.nodes = new_nodes;
+
+        Ok(())
+    }
+
+    pub fn rebuild_outputs(&mut self) {
+        let mut outs = vec![Vec::new(); self.nodes.len()];
+
+        for (node_id, node) in self.nodes.iter().enumerate() {
+            for &inp in &node.inputs {
+                outs[inp].push(node_id);
+            }
+        }
+
+        for (i, o) in outs.into_iter().enumerate() {
+            self.nodes[i].outputs = o;
+        }
+    }
+
+    /// Validates the graph for mathematical correctness given the metadata usesd during lowering.
+    ///
+    /// # Errors
+    ///
+    /// This function will not panic, but it can stop many panics, bugs, and errors in:
+    ///
+    /// - [`Self::lower`]
+    /// - [`GpuContext::compile`](`super::GpuContext::compile`)
+    /// - [`Steamspatch_forward`](`super::Steamspatch_forward`)
+    /// - [`Steamspatch_backward`](`super::Steamspatch_backward`)
+    /// - [`Steamspatch_loss`](`super::Steamspatch_loss`)
+    /// - Probably a lot more
+    ///
+    /// It is recommended that you run this function on your graph at least in debug mode, or
+    /// you could have panics in production code.
+    pub fn validate(&self, meta: Metadata) -> Result<(), Vec<Error<GraphErrorContext>>> {
+        let mut errors = Vec::new();
+
+        check_acrylicity(self, &mut errors);
+        check_inputs_exist(self, &mut errors);
+        check_metadata(self, meta, &mut errors);
+        check_shapes(self, &mut errors);
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors)
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn compute_saved_nodes(&self) -> Vec<SaveIndicator> {
+        let mut saved = vec![SaveIndicator { flags: 0 }; self.nodes.len()];
+
+        for (node_id, node) in self.nodes.iter().enumerate() {
+            match node.op {
+                GraphOp::Input => {
+                    saved[node_id] |=
+                        SaveIndicator::DEFINED_IN_BACKWARD | SaveIndicator::USED_BY_BACKWARD;
+                }
+
+                GraphOp::Custom { save, .. } => {
+                    save(node_id, node, self, &mut saved);
+                }
+
+                _ => {}
+            }
+        }
+
+        saved
+    }
+
+    /// Lowers an execution graph into kernels.
+    ///
+    /// # Errors
+    ///
+    /// Fails if the graph has invalid operations.
+    pub fn lower(&self, meta: Metadata, saved: &[SaveIndicator]) -> Result<KernelGroup, Error> {
+        KernelsChained::lower(
+            self,
+            meta,
+            saved,
+            &self.options.ok_or(Error {
+                msg: "no compilation options attached to graph",
+                kind: ErrorKind::InvalidArgument,
+                ctx: (),
+            })?,
+        )
+    }
+
+    pub fn push_node(&mut self, node: Node) -> NodeId {
+        let id = self.nodes.len();
+
+        for node_id in &node.inputs {
+            let node = &mut self.nodes[*node_id];
+            node.outputs.push(id);
+        }
+
+        self.nodes.push(node);
+
+        id
+    }
+
+    fn add_node<T: Into<Box<[usize]>>>(
+        &mut self,
+        name: &'static str,
+        op: GraphOp,
+        inputs: T,
+        shape: T,
+        dtype: SimpleDType,
+    ) -> NodeId {
+        let id = self.nodes.len();
+
+        let inputs = inputs.into();
+
+        for node_id in &inputs {
+            let node = &mut self.nodes[*node_id];
+            node.outputs.push(id);
+        }
+
+        self.nodes.push(Node {
+            name: name.into(),
+            outputs: Vec::new(),
+            op,
+            inputs,
+            shape: shape.into(),
+            dtype,
+        });
+
+        id
+    }
+
+    pub fn input(&mut self, shape: &[MetaId], dtype: SimpleDType) -> NodeId {
+        self.add_node::<&[usize]>("input", GraphOp::Input, &[], shape, dtype)
+    }
+
+    pub fn constant_f32(&mut self, data: f32) -> NodeId {
+        self.add_node::<&[usize]>(
+            "const_f32",
+            GraphOp::ConstF32(data),
+            &[],
+            &[],
+            SimpleDType::F32,
+        )
+    }
+
+    pub fn constant_u32(&mut self, data: u32) -> NodeId {
+        self.add_node::<&[usize]>(
+            "const_u32",
+            GraphOp::ConstU32(data),
+            &[],
+            &[],
+            SimpleDType::F32,
+        )
+    }
+
+    pub fn constant_i32(&mut self, data: i32) -> NodeId {
+        self.add_node::<&[usize]>(
+            "const_i32",
+            GraphOp::ConstI32(data),
+            &[],
+            &[],
+            SimpleDType::F32,
+        )
+    }
+
+    pub fn constant_f16(&mut self, data: f16) -> NodeId {
+        self.add_node::<&[usize]>(
+            "const_f16",
+            GraphOp::ConstF16(data),
+            &[],
+            &[],
+            SimpleDType::F32,
+        )
+    }
+
+    pub fn constant_bf16(&mut self, data: bf16) -> NodeId {
+        self.add_node::<&[usize]>(
+            "const_bf16",
+            GraphOp::ConstBf16(data),
+            &[],
+            &[],
+            SimpleDType::F32,
+        )
+    }
+
+    pub fn repeat<I>(&mut self, count: usize, mut start: I, structure: fn(&mut Self, I) -> I) {
+        for _ in 0..count {
+            start = structure(self, start);
+        }
+    }
+}

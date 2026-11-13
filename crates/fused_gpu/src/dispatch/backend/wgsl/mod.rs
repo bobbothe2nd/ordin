@@ -340,7 +340,7 @@ impl GpuBackend for GpuContext {
         let source = generate::generate_wgsl(src, params, options)?;
 
         let shader = self.device.create_shader_module(ShaderModuleDescriptor {
-            label: None,
+            label: Some(&src.name),
             source: ShaderSource::Wgsl(source.into()),
         });
 

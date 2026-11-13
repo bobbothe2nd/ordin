@@ -51,12 +51,12 @@ impl Graph {
     }
 
     #[inline]
-    pub fn set_options(&mut self, options: CompilationOptions) {
+    pub fn configure(&mut self, options: CompilationOptions) {
         self.inner_mut().options = Some(options);
     }
 
     #[inline]
-    pub fn get_options(&self) -> Option<CompilationOptions> {
+    pub fn get_cfg(&self) -> Option<CompilationOptions> {
         self.inner().options
     }
 

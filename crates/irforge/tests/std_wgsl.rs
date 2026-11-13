@@ -29,7 +29,7 @@ fn mul_add_forward_backward() {
         debug: DebugCompilationOptions::empty(),
     };
 
-    graph.set_options(options);
+    graph.configure(options);
     graph.define(|| {
         let a = input(&[m, n], SimpleDType::F32);
         let b = input(&[m, n], SimpleDType::F32);
@@ -105,7 +105,7 @@ fn matmul_sub_softmax_forward_backward() {
     use simplelog::*;
 
     let logs =
-        std::fs::File::create("E:/fused_gpu/logs/div_const_softmax_forward_backward.log").unwrap();
+        std::fs::File::create("E:/fused_gpu/logs/matmul_sub_softmax_forward_backward.log").unwrap();
     CombinedLogger::init(vec![
         TermLogger::new(
             LevelFilter::Warn,
@@ -136,7 +136,7 @@ fn matmul_sub_softmax_forward_backward() {
         debug: DebugCompilationOptions::PRETTY_PRINT_IR | DebugCompilationOptions::SOFT_MMA,
     };
 
-    graph.set_options(options);
+    graph.configure(options);
     graph.define(|| {
         let a = input(&[m, k], SimpleDType::F32);
         let b = input(&[k, n], SimpleDType::F32);
@@ -198,6 +198,7 @@ fn matmul_sub_softmax_forward_backward() {
 
     ctx.download(out_tensor, &mut dst, 0).unwrap();
     let download = &dst[..1024];
+    println!("{:?}", &download[..64]);
     assert!(download.iter().all(|x| *x == 1.0 / 64.0));
 
     ctx.download(&grad_tensors[0], &mut dst, 0).unwrap();
@@ -232,7 +233,7 @@ fn div_const_softmax_forward_backward() {
         debug: DebugCompilationOptions::PRETTY_PRINT_IR | DebugCompilationOptions::SOFT_MMA,
     };
 
-    graph.set_options(options);
+    graph.configure(options);
     graph.define(|| {
         let x = input(&[m, n], SimpleDType::F32);
 
@@ -322,7 +323,7 @@ fn matmul_add_forward_backward() {
         debug: DebugCompilationOptions::empty(),
     };
 
-    graph.set_options(options);
+    graph.configure(options);
     graph.define(|| {
         let a = input(&[m, k], SimpleDType::F32);
         let b = input(&[k, n], SimpleDType::F32);
@@ -447,7 +448,7 @@ fn matmul_chain3_forward_backward() {
         debug: DebugCompilationOptions::empty(),
     };
 
-    graph.set_options(options);
+    graph.configure(options);
     graph.define(|| {
         let a = input(&[m, k], SimpleDType::F32);
         let b = input(&[k, n], SimpleDType::F32);
@@ -595,7 +596,7 @@ fn matmul_sub_forward_backward() {
         debug: DebugCompilationOptions::empty(),
     };
 
-    graph.set_options(options);
+    graph.configure(options);
     graph.define(|| {
         let a = input(&[m, k], SimpleDType::F32);
         let b = input(&[k, n], SimpleDType::F32);

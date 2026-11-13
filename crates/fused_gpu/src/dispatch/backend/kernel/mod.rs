@@ -100,8 +100,8 @@ pub struct KernelsChained {
 
 #[derive(Debug)]
 pub struct KernelsRedirected {
-    pub kernels: Vec<Dependencies<Redirect<LinkedKernel>>>,
-    pub params: Vec<Param>,
+    pub kernels: Box<[Dependencies<Redirect<LinkedKernel>>]>,
+    pub params: Box<[Param]>,
 }
 
 impl KernelsChained {
@@ -187,8 +187,8 @@ fn eliminate_kernels(kernels: KernelsChained) -> KernelsRedirected {
     }
 
     KernelsRedirected {
-        kernels: kernels_optimized,
-        params: kernels.params,
+        kernels: kernels_optimized.into_boxed_slice(),
+        params: kernels.params.into_boxed_slice(),
     }
 }
 
@@ -340,19 +340,19 @@ impl LinkedKernel {
 }
 
 impl LinkedKernel {
-    pub fn register_param(&mut self, id: ParamId) {
+    pub const fn register_param(&mut self, id: ParamId) {
         self.params[id] = true;
     }
 
-    pub fn register_meta(&mut self, field: MetaId) {
+    pub const fn register_meta(&mut self, field: MetaId) {
         self.meta[field] = true;
     }
 
-    pub fn unregister_param(&mut self, id: ParamId) {
+    pub const fn unregister_param(&mut self, id: ParamId) {
         self.params[id] = false;
     }
 
-    pub fn unregister_meta(&mut self, field: MetaId) {
+    pub const fn unregister_meta(&mut self, field: MetaId) {
         self.meta[field] = false;
     }
 }
