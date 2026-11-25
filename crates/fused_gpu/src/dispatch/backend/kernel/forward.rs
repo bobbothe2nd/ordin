@@ -67,26 +67,44 @@ pub fn lower_forward(
         for &input in &node.inputs {
             let input_node = &graph.nodes[input];
 
+            let pid = params.len();
+
+            let param = Param {
+                dtype: input_node.dtype,
+                ty: ParamTy::ReadOnly,
+                pid,
+            };
+
+            if let Some(pid) = saved_params[input] {
+                node_params[input] = Some(pid);
+            }
+
             if matches!(input_node.op, GraphOp::Input) {
-                ensure_param_slot(
-                    &mut node_params,
-                    input,
-                    Param {
-                        dtype: input_node.dtype,
-                        ty: ParamTy::ReadOnly,
-                        pid: params.len(),
-                    },
-                    &mut params,
-                );
+                node_params[input].is_none().then(|| {
+                    params.push(param);
+                    node_params[input] = Some(pid);
+                });
             }
         }
     }
 
+    let root_node = &graph.nodes[graph.nodes.len() - 1];
+    if !root_node.outputs.is_empty() {
+        return Err(Error {
+            msg: "graph not topologically sorted",
+            kind: ErrorKind::InvalidArgument,
+            ctx: (),
+        });
+    }
+
     let output_param = params.len();
-    saved_params[graph.nodes.len() - 1] = Some(output_param);
+    if root_node.op.saves_output() {
+        saved_params[graph.nodes.len() - 1] = Some(output_param);
+    }
+    node_params[graph.nodes.len() - 1] = Some(output_param);
 
     params.push(Param {
-        dtype: graph.nodes[graph.nodes.len() - 1].dtype,
+        dtype: root_node.dtype,
         ty: ParamTy::ReadWrite,
         pid: output_param,
     });
@@ -282,21 +300,6 @@ pub fn lower_forward(
     Ok(KernelsChained { kernels, params })
 }
 
-#[inline]
-fn ensure_param_slot(
-    node_params: &mut [Option<ParamId>],
-    node_id: NodeId,
-    param: Param,
-    params: &mut Vec<Param>,
-) -> ParamId {
-    node_params[node_id].unwrap_or_else(|| {
-        let pid = params.len();
-        params.push(param);
-        node_params[node_id] = Some(pid);
-        pid
-    })
-}
-
 fn eval_node(
     root: NodeId,
     node_id: &NodeInput,
@@ -407,7 +410,7 @@ fn eval_node(
                     *stable_iteration_space = false;
                 }
 
-                let param = saved_params[node_id].ok_or(Error {
+                let param = node_params[node_id].ok_or(Error {
                     msg: "saved root param not materialized",
                     kind: ErrorKind::ParamNotMaterialized,
                     ctx: (),
@@ -450,7 +453,7 @@ fn eval_node(
         }
     }
 
-    if let Some(saved) = saved_params[node_id]
+    if let Some(saved) = node_params[node_id]
         && node.op.is_auto_save()
     {
         kernel.param_store(saved, index, out);
